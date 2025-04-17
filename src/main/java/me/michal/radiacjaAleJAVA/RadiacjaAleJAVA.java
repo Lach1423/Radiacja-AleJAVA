@@ -51,7 +51,6 @@ public final class RadiacjaAleJAVA extends JavaPlugin implements Listener {
     public static HashSet<Player> playersRTD = new HashSet<>();
     public static int radius;
     public static int height;
-    public static long duration = 600000L;
 
     public ItemStack potkaLugola() {
         ItemStack potion = new ItemStack(Material.POTION, 3);
@@ -61,7 +60,7 @@ public final class RadiacjaAleJAVA extends JavaPlugin implements Listener {
         meta.setColor(Color.WHITE);
         meta.setDisplayName(ChatColor.BLUE + "Płyn Lugola");
         ArrayList<String> lore = new ArrayList<>();
-        lore.add(ChatColor.WHITE + "Daje ochrone przed radiacyją na " + duration/60000 + " minut");
+        lore.add(ChatColor.WHITE + "Daje ochrone przed radiacyją na " + config.getLong("Duration")/60000 + " minut");
         meta.setLore(lore);
 
         meta.getPersistentDataContainer().set(key, PersistentDataType.STRING, "to_lugola_fluid");
@@ -89,7 +88,7 @@ public final class RadiacjaAleJAVA extends JavaPlugin implements Listener {
 
 
         BukkitTask damageInflicter = new DamageInflicter(this).runTaskTimer(this, 0L, 5L);
-        BukkitTask curedPlayersTracker = new CuredPlayersTracker(this).runTaskTimer(this, 0L, 5L);
+        BukkitTask curedPlayersTracker = new CuredPlayersTracker(this, this.getConfig()).runTaskTimer(this, 0L, 5L);
 
         affectedBar = Bukkit.createBossBar(ChatColor.RED + "Strefa radiacji", BarColor.RED, BarStyle.SOLID);
 
@@ -103,9 +102,9 @@ public final class RadiacjaAleJAVA extends JavaPlugin implements Listener {
 
 
         config.addDefault("Radiation_Safe_Zone_Size", 0);
-        config.addDefault("Duration", 600000L);
         config.addDefault("Death_Lightning_Strike", true);
         config.addDefault("Drop_Player_Head", true);
+        config.addDefault("Duration", 600000L);
         config.addDefault("End_Enabled", false);
         config.addDefault("Radiation_Name", "Strefa radiacji");
         config.options().copyDefaults(true);
@@ -128,7 +127,7 @@ public final class RadiacjaAleJAVA extends JavaPlugin implements Listener {
     }
 
     public void addCuredTime(Player player) {
-        long newStartTime = curedPlayers.get(player) + duration;
+        long newStartTime = curedPlayers.get(player) + config.getLong("Duration");
         curedPlayers.replace(player, newStartTime);
     }
 
@@ -400,9 +399,10 @@ public final class RadiacjaAleJAVA extends JavaPlugin implements Listener {
                     try {
                         boolean shouldStrikeLightning = Boolean.parseBoolean(args[0]);
                         ChatColor color = shouldStrikeLightning ? ChatColor.GREEN : ChatColor.RED;
-                        config.set("doDeathLightningStrike", shouldStrikeLightning);
+                        config.set("Death_Lightning_Strike", shouldStrikeLightning);
+                        saveConfig();
 
-                        sender.sendMessage("doDeathLightningStrike is now set to: " + color + shouldStrikeLightning);
+                        sender.sendMessage("Death_Lightning_Strike is now set to: " + color + shouldStrikeLightning);
                     } catch (Exception e) {
                         sender.sendMessage(ChatColor.RED + "Napisz <true> lub <false>");
                     }
@@ -411,7 +411,8 @@ public final class RadiacjaAleJAVA extends JavaPlugin implements Listener {
                     try {
                         boolean shouldDropPlayerHead = Boolean.parseBoolean(args[0]);
 
-                        config.set("dropPlayerHead", shouldDropPlayerHead);
+                        config.set("Drop_Player_Head", shouldDropPlayerHead);
+                        saveConfig();
 
                         ChatColor color = shouldDropPlayerHead ? ChatColor.GREEN : ChatColor.RED;
                         sender.sendMessage("dropPlayerHead is now set to: " + color + shouldDropPlayerHead);
@@ -423,7 +424,8 @@ public final class RadiacjaAleJAVA extends JavaPlugin implements Listener {
                     try {
                         long timeInMinutes = Math.abs(Long.parseLong(args[0]));
                         config.set("Duration", timeInMinutes * 60 * 1000);
-                        duration = timeInMinutes * 60 * 1000;
+                        saveConfig();
+
                         String minut_Odmienioned = (timeInMinutes > 20 && (timeInMinutes % 10 >= 2 && timeInMinutes % 10 <= 4)) ? "minuty" : "minut";
                         sender.sendMessage("Czas trwania potki to teraz: " + timeInMinutes + " " + minut_Odmienioned);
                     } catch (Exception e) {
@@ -434,6 +436,8 @@ public final class RadiacjaAleJAVA extends JavaPlugin implements Listener {
                     try {
                         boolean a = Boolean.parseBoolean(args[0]);
                         config.set("End_Enabled", a);
+                        saveConfig();
+
                         sender.sendMessage("End jest teraz " + a + " czy coś");
                     } catch (Exception e) {
                         sender.sendMessage("Coś poszło nie tak, potencjalnie źle true lub false napisałeś");

@@ -20,7 +20,7 @@ commands:
   setDurationTo:
     description: "Ustawia czas trwania Lugola"
     usage: "/setDurationTo <czaswminutach>"
-  EndEnabled:
+  endEnabled:
     description: "Set's End enabalding"
     usage: "/EndEnabled <true/false>"
   setRadiationName:
