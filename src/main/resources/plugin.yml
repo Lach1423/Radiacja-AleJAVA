@@ -13,10 +13,10 @@ commands:
     usage: "/radiationsafezone <radius>"
   deathLightningStrike:
     description: "Decyduje czy jest piorun po śmierci gracza"
-    usage: "/doDeathLightningStrike <true/false>"
+    usage: "/deathLightningStrike <true/false>"
   dropPlayerHead:
     description: "Decyduje czy wypada głowa gracza po śmierci"
-    usage: "/dropPlayerHead"
+    usage: "/dropPlayerHead <true\false>"
   setDurationTo:
     description: "Ustawia czas trwania Lugola"
     usage: "/setDurationTo <czaswminutach>"
