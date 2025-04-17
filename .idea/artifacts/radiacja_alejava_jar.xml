@@ -1,0 +1,8 @@
+<component name="ArtifactManager">
+  <artifact type="jar" name="radiacja-alejava:jar">
+    <output-path>$USER_HOME$/Desktop/papjer 1.21.4/plugins</output-path>
+    <root id="archive" name="radiacja-alejava.jar">
+      <element id="module-output" name="radiacja-alejava" />
+    </root>
+  </artifact>
+</component>

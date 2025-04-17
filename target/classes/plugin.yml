@@ -1,0 +1,28 @@
+name: Radiacja-aleJAVA
+version: '1.0-SNAPSHOT'
+main: me.michal.radiacjaAleJAVA.RadiacjaAleJAVA
+api-version: '1.21'
+depend: [WorldGuard]
+description: "no plugin debilu"
+commands:
+  WhatsSafeZoneSize:
+    description: "Podaje promień bezpiecznej strefy"
+    usage: "/WhatsSafeZoneSize"
+  radiationsafezone:
+    description: "Dodanie strefy bezpiecznej"
+    usage: "/radiationsafezone <radius>"
+  doDeathLightningStrike:
+    description: "Decyduje czy jest piorun po śmierci gracza"
+    usage: "/doDeathLightningStrike <true/false>"
+  dropPlayerHead:
+    description: "Decyduje czy wypada głowa gracza po śmierci"
+    usage: "/dropPlayerHead"
+  setDurationTo:
+    description: "Ustawia czas trwania Lugola"
+    usage: "/setDurationTo <czaswminutach>"
+  EndEnabled:
+    description: "Set's End enabalding"
+    usage: "/EndEnabled <true/false>"
+  setRadiationName:
+    description: "Set's Radiation Bossbar name"
+    usage: "/setRadiationName"
