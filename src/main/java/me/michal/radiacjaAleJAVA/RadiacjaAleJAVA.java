@@ -92,14 +92,13 @@ public final class RadiacjaAleJAVA extends JavaPlugin implements Listener {
 
         affectedBar = Bukkit.createBossBar(ChatColor.RED + "Strefa radiacji", BarColor.RED, BarStyle.SOLID);
 
+        Objects.requireNonNull(this.getCommand("WhatsSafeZoneSize")).setExecutor(this);
         Objects.requireNonNull(this.getCommand("radiationsafezone")).setExecutor(this);
         Objects.requireNonNull(this.getCommand("deathLightningStrike")).setExecutor(this);
         Objects.requireNonNull(this.getCommand("dropPlayerHead")).setExecutor(this);
         Objects.requireNonNull(this.getCommand("setDurationTo")).setExecutor(this);
         Objects.requireNonNull(this.getCommand("endEnabled")).setExecutor(this);
         Objects.requireNonNull(this.getCommand("setRadiationName")).setExecutor(this);
-
-
 
         config.addDefault("Radiation_Safe_Zone_Size", 0);
         config.addDefault("Death_Lightning_Strike", true);

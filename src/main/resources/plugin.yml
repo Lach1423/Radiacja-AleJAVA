@@ -11,7 +11,7 @@ commands:
   radiationsafezone:
     description: "Dodanie strefy bezpiecznej"
     usage: "/radiationsafezone <radius>"
-  doDeathLightningStrike:
+  deathLightningStrike:
     description: "Decyduje czy jest piorun po śmierci gracza"
     usage: "/doDeathLightningStrike <true/false>"
   dropPlayerHead:
