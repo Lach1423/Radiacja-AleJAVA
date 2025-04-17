@@ -147,7 +147,7 @@ public final class RadiacjaAleJAVA extends JavaPlugin implements Listener {
         removeAllEffects(player);
 
         Location location = player.getLocation();
-        if (config.getBoolean("deathLightningStrike")) {
+        if (config.getBoolean("Death_Lightning_Strike")) {
             if (player.getName().equals("lach1423")) {
                 for (int i = 0; i < 6; i++) {
                     player.getWorld().strikeLightningEffect(location);
@@ -156,7 +156,7 @@ public final class RadiacjaAleJAVA extends JavaPlugin implements Listener {
                 player.getWorld().strikeLightningEffect(location);
             }
         }
-        if (config.getBoolean("dropPlayerHead")) {
+        if (config.getBoolean("Drop_Player_Head")) {
             dropPlayerHead(player, location, event.getDeathMessage());
         }
     }
@@ -394,7 +394,7 @@ public final class RadiacjaAleJAVA extends JavaPlugin implements Listener {
                     sender.sendMessage(ChatColor.RED + "Musisz być graczem");
                     }
             }
-                case "doDeathLightningStrike" -> {
+                case "deathLightningStrike" -> {
                     try {
                         boolean shouldStrikeLightning = Boolean.parseBoolean(args[0]);
                         ChatColor color = shouldStrikeLightning ? ChatColor.GREEN : ChatColor.RED;
@@ -414,7 +414,7 @@ public final class RadiacjaAleJAVA extends JavaPlugin implements Listener {
                         saveConfig();
 
                         ChatColor color = shouldDropPlayerHead ? ChatColor.GREEN : ChatColor.RED;
-                        sender.sendMessage("dropPlayerHead is now set to: " + color + shouldDropPlayerHead);
+                        sender.sendMessage("Drop_Player_Head is now set to: " + color + shouldDropPlayerHead);
                     } catch (Exception e) {
                         sender.sendMessage(ChatColor.RED + "Napisz <true> lub <false>");
                     }
@@ -446,6 +446,7 @@ public final class RadiacjaAleJAVA extends JavaPlugin implements Listener {
                     String a = String.valueOf(args[0]);
                     affectedBar.setTitle(a);
                     config.set("Radiation_Name", a);
+                    saveConfig();
                 }
             }
         } else {
