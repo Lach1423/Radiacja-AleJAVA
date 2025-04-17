@@ -4,6 +4,7 @@ package me.michal.radiacjaAleJAVA.Tasks.Things;
 import me.michal.radiacjaAleJAVA.RadiacjaAleJAVA;
 import org.bukkit.Bukkit;
 import org.bukkit.ChatColor;
+import org.bukkit.entity.Player;
 import org.bukkit.event.block.SignChangeEvent;
 
 import java.io.*;
@@ -16,15 +17,17 @@ public class Updater {
     private static URL url;
     private static File updateFolder;
     private static File file;
+    private static Player player;
 
     public Updater(RadiacjaAleJAVA plugin) {
         Updater.plugin = plugin;
     }
 
-    public void updatePlugin(SignChangeEvent event, File file) {
+    public void updatePlugin(SignChangeEvent event, File file, Player p) {
         Updater.e = event;
         Updater.updateFolder = Bukkit.getUpdateFolderFile();
         Updater.file = file;
+        Updater.player = p;
 
 
         if (getLatestVersion() == null) {
@@ -35,8 +38,8 @@ public class Updater {
         try {
             Updater.url = URI.create("https://github.com/Lach1423/Radiacja/raw/refs/heads/main/" + fileToGet).toURL();
         } catch (Exception ex) {
-            event.setLine(1, "Invalid link file");
-            plugin.setColor(e, ChatColor.RED);
+            player.sendMessage(ChatColor.RED + "Invalid link file");
+            player.sendMessage(Updater.url.toString());
         }
         saveFile();
     }
@@ -50,9 +53,10 @@ public class Updater {
             nv = br.readLine();
             nv = nv.substring(nv.lastIndexOf(" ") + 1);
             br.close();
-        } catch (Exception err) {
-            e.setLine(1, "zły version.txt");
-            plugin.setColor(e, ChatColor.RED);
+
+        } catch (Exception er) {
+            player.sendMessage(ChatColor.RED + "zły version.txt");
+
             return null;
         }
         return nv;
@@ -64,12 +68,12 @@ public class Updater {
         deleteOldFile();
         if (!folder.exists()) {
             if (!folder.mkdir()) {
-                e.getPlayer().sendMessage("Failed to create" + folder);
+                player.sendMessage("Failed to create" + folder);
             }
         }
         downloadFile();
 
-        e.setLine(2, "Downloaded");
+        player.sendMessage("Downloaded");
     }
 
     private void deleteOldFile() {
@@ -77,9 +81,9 @@ public class Updater {
         for (File x : list) {
             if (x.getName().equals(file.getName())) {
                 if (x.delete()) {
-                    e.setLine(0, "usunięto");
+                    player.sendMessage("usunięto");
                 } else {
-                    e.setLine(0, "nie usunięto");
+                    player.sendMessage("nie usunięto");
                 }
             }
         }
@@ -88,7 +92,7 @@ public class Updater {
     private File[] listFilesOrError(File folder) {
         File[] contents = folder.listFiles();
         if (contents == null) {
-            e.setLine(1, "no bitches/files");
+            player.sendMessage("no bitches/files");
             return new File[0];
         } else {
             return contents;
@@ -114,29 +118,25 @@ public class Updater {
                 fout.write(data, 0, count);
                 final int percent = (int) ((downloaded * 100) / fileLength);
                 if (((percent % 10) == 0)) {
-                    e.setLine(1, "Downloading: " + percent + "%");
+                    player.sendMessage("Downloading: " + percent + "%");
                 }
             }
         } catch (Exception ex) {
-            e.setLine(1, "Failure in");
-            e.setLine(2, "downloading");
-            plugin.setColor(e, ChatColor.RED);
+            player.sendMessage(ChatColor.RED + "Failure in downloading");
         } finally {
             try {
                 if (in != null) {
                     in.close();
                 }
             } catch (final IOException ex) {
-                e.setLine(1, "failed to close in");
-                plugin.setColor(e, ChatColor.RED);
+                player.sendMessage("failed to close in");
             }
             try {
                 if (fout != null) {
                     fout.close();
                 }
             } catch (final IOException ex) {
-                e.setLine(1, "failed to close fo");
-                plugin.setColor(e, ChatColor.RED);
+                player.sendMessage("failed to close fo");
             }
         }
 

