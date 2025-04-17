@@ -4,6 +4,7 @@ import me.michal.radiacjaAleJAVA.RadiacjaAleJAVA;
 import org.bukkit.Bukkit;
 import org.bukkit.ChatColor;
 import org.bukkit.boss.BossBar;
+import org.bukkit.configuration.file.FileConfiguration;
 import org.bukkit.entity.Player;
 import org.bukkit.scheduler.BukkitRunnable;
 import static me.michal.radiacjaAleJAVA.RadiacjaAleJAVA.*;
@@ -11,19 +12,21 @@ import static me.michal.radiacjaAleJAVA.RadiacjaAleJAVA.*;
 public class CuredPlayersTracker extends BukkitRunnable {
 
     RadiacjaAleJAVA plugin;
+    FileConfiguration config;
 
-    public CuredPlayersTracker(RadiacjaAleJAVA plugin) {
+    public CuredPlayersTracker(RadiacjaAleJAVA plugin, FileConfiguration config) {
         this.plugin = plugin;
+        this.config = config;
     }
 
     @Override
     public void run() {
         for (Player player : curedPlayers.keySet()) {
             long timePassed = System.currentTimeMillis() - curedPlayers.get(player);
-            long timeLeft = duration - timePassed;
+            long timeLeft = config.getLong("Duration") - timePassed;
             BossBar curedBar = curedBars.get(player);
             if (timeLeft > 0 && timeLeft < 600000) {
-                double progressOfBar = (double) timeLeft / duration;
+                double progressOfBar = (double) timeLeft / config.getLong("Duration");
                 curedBar.setProgress(progressOfBar);
                 curedBar.setTitle(ChatColor.GREEN + "Działanie płynu Lugola");
             } else if (timeLeft <= 0) {
