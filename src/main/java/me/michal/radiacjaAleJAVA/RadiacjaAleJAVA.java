@@ -470,7 +470,7 @@ public final class RadiacjaAleJAVA extends JavaPlugin implements Listener {
 
     @EventHandler
     public void onEndEnter(PlayerPortalEvent event) {
-        if (!config.getBoolean("End_Enabled")) {
+        if (!config.getBoolean("End_Enabled") && event.getCause() == PlayerTeleportEvent.TeleportCause.END_PORTAL) {
             event.setCancelled(true);
             event.getPlayer().sendMessage(ChatColor.RED + "End is disabled!");
         }
