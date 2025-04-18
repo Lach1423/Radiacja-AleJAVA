@@ -54,7 +54,7 @@ public class Updater {
             nv = nv.substring(nv.lastIndexOf(" ") + 1);
             br.close();
 
-        } catch (Exception er) {
+        } catch (Exception err) {
             player.sendMessage(ChatColor.RED + "zły version.txt");
 
             return null;
