@@ -256,9 +256,25 @@ public final class RadiacjaAleJAVA extends JavaPlugin implements Listener {
         Player p = e.getPlayer();
         double r = config.getDouble("Radiation_Safe_Zone_Size");
         double h = config.getDouble("Radiation_Safe_Zone_Height");
-        for (double a = -h; a <= h; a++) {
-            for (double i = -r; i <= r; i++) {
-                p.sendBlockChange(new Location(p.getWorld(), i, a, -r - 1), Material.RED_STAINED_GLASS.createBlockData()); //Pasek maker
+
+        for (double a = -h; a <= h; a++) { // Prostokąt maker
+            for (double i = -r; i <= r; i++) { //Pasek maker
+                p.sendBlockChange(new Location(p.getWorld(), i, a, -r - 1), Material.RED_STAINED_GLASS.createBlockData());
+            }
+        }
+        for (double a = -h; a <= h; a++) { // Prostokąt maker
+            for (double i = -r; i <= r; i++) { //Pasek maker
+                p.sendBlockChange(new Location(p.getWorld(), i, a, r + 1), Material.RED_STAINED_GLASS.createBlockData());
+            }
+        }
+        for (double a = -h; a <= h; a++) { // Prostokąt maker
+            for (double i = -r; i <= r; i++) { //Pasek maker
+                p.sendBlockChange(new Location(p.getWorld(), r + 1, a, i), Material.RED_STAINED_GLASS.createBlockData());
+            }
+        }
+        for (double a = -h; a <= h; a++) { // Prostokąt maker
+            for (double i = -r; i <= r; i++) { //Pasek maker
+                p.sendBlockChange(new Location(p.getWorld(), -r - 1, a, i), Material.RED_STAINED_GLASS.createBlockData());
             }
         }
     }
