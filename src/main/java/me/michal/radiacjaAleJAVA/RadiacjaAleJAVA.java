@@ -1,5 +1,7 @@
 package me.michal.radiacjaAleJAVA;
 
+import com.comphenix.protocol.ProtocolLibrary;
+import com.comphenix.protocol.ProtocolManager;
 import com.sk89q.worldedit.bukkit.BukkitAdapter;
 import com.sk89q.worldedit.math.BlockVector3;
 import com.sk89q.worldguard.WorldGuard;
@@ -82,7 +84,6 @@ public final class RadiacjaAleJAVA extends JavaPlugin implements Listener {
 
     @Override
     public void onEnable() {
-
         // Plugin startup logic
         this.getServer().getPluginManager().registerEvents(this, this);
 
