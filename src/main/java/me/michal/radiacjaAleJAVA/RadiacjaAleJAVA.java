@@ -1,7 +1,10 @@
 package me.michal.radiacjaAleJAVA;
 
+import com.comphenix.protocol.PacketType;
 import com.comphenix.protocol.ProtocolLibrary;
 import com.comphenix.protocol.ProtocolManager;
+import com.comphenix.protocol.events.PacketContainer;
+import com.comphenix.protocol.wrappers.EnumWrappers;
 import com.sk89q.worldedit.bukkit.BukkitAdapter;
 import com.sk89q.worldedit.math.BlockVector3;
 import com.sk89q.worldguard.WorldGuard;
@@ -102,6 +105,7 @@ public final class RadiacjaAleJAVA extends JavaPlugin implements Listener {
         Objects.requireNonNull(this.getCommand("setRadiationName")).setExecutor(this);
 
         config.addDefault("Radiation_Safe_Zone_Size", 0);
+        config.addDefault("Radiation_Safe_Zone_Height", 0);
         config.addDefault("Death_Lightning_Strike", true);
         config.addDefault("Drop_Player_Head", true);
         config.addDefault("Duration", 600000L);
@@ -248,6 +252,16 @@ public final class RadiacjaAleJAVA extends JavaPlugin implements Listener {
     }
 
     @EventHandler
+    public void chatEvent(AsyncPlayerChatEvent e) {
+        Player p = e.getPlayer();
+        double r = config.getDouble("Radiation_Safe_Zone_Size");
+        double h = config.getDouble("Radiation_Safe_Zone_Height");
+        for (double i = -r; i <= r; i++) {
+            p.sendBlockChange(new Location(p.getWorld(), i, 70, -r - 1), Material.RED_STAINED_GLASS.createBlockData());
+        } //Pasek maker
+    }
+
+    @EventHandler
     public void onBrewEnd(BrewEvent event) {
         BrewerInventory inventory = event.getContents();
         if (!isLugolRecipe(inventory)) {
@@ -342,13 +356,11 @@ public final class RadiacjaAleJAVA extends JavaPlugin implements Listener {
     public boolean onCommand(CommandSender sender, Command command, String label, String[] args) {
         String commandName = command.getName();
         if (commandName.equalsIgnoreCase("WhatsSafeZoneSize")) {
-            radius = config.getInt("radiationSafeZoneSize");
+            radius = config.getInt("Radiation_Safe_Zone_Size");
             if (radius != 0) {
-                if (sender instanceof Player) {
-                    sender.sendMessage(ChatColor.GREEN + "Bezpieczna strefa ma promień o długości: " + radius);
-                }
+                sender.sendMessage(ChatColor.GREEN + "Bezpieczna strefa ma promień o długości: " + radius);
             } else {
-                sender.sendMessage(ChatColor.RED + "Jeszcze nie stworzono bezpiezcnej stefy");
+                sender.sendMessage(ChatColor.RED + "Jeszcze nie stworzono bezpiecznej stefy");
             }
             return true;
         }
@@ -366,6 +378,7 @@ public final class RadiacjaAleJAVA extends JavaPlugin implements Listener {
 
                             if (getSafeZone((Player) sender, "rad", radius, height)) {
                                 config.set("Radiation_Safe_Zone_Size", radius);
+                                config.set("Radiation_Safe_Zone_Height", height);
                                 saveConfig();
                                 sender.sendMessage(ChatColor.GREEN + "Bezpieczna strefa ma teraz promień: " + radius);
                             } else {
