@@ -29,10 +29,11 @@ public class PacketSender {
     }
 
     public void sendPacket(Player p) {
+        int v = p.getClientViewDistance();
         if (chunk.getX() >= 0) {
-            for (int he = -1; he < 2; he++) {
-                for (int i = -1; i < 2; i++) {
-                    sendPacketEast(p, (int) (p.getY()/16) + he, chunk.getZ() + i);
+            for (int z = -v/2; z < v/2+1; z++) {
+                for (int h = -1; h < 2; h++) {
+                    sendPacketEast(p, (int) (p.getY()/16) + h, chunk.getZ() + z);
                 }
             }
         } else {
