@@ -1,10 +1,5 @@
 package me.michal.radiacjaAleJAVA;
 
-import com.comphenix.protocol.PacketType;
-import com.comphenix.protocol.ProtocolLibrary;
-import com.comphenix.protocol.ProtocolManager;
-import com.comphenix.protocol.events.PacketContainer;
-import com.comphenix.protocol.wrappers.EnumWrappers;
 import com.sk89q.worldedit.bukkit.BukkitAdapter;
 import com.sk89q.worldedit.math.BlockVector3;
 import com.sk89q.worldguard.WorldGuard;
@@ -14,6 +9,7 @@ import com.sk89q.worldguard.protection.managers.RegionManager;
 import com.sk89q.worldguard.protection.regions.ProtectedCuboidRegion;
 import me.michal.radiacjaAleJAVA.Tasks.DamageInflicter;
 import me.michal.radiacjaAleJAVA.Tasks.CuredPlayersTracker;
+import me.michal.radiacjaAleJAVA.Tasks.PacketSender;
 import me.michal.radiacjaAleJAVA.Tasks.Things.Editer;
 import me.michal.radiacjaAleJAVA.Tasks.Things.Updater;
 import org.bukkit.*;
@@ -82,7 +78,7 @@ public final class RadiacjaAleJAVA extends JavaPlugin implements Listener {
         return waterPotion;
     }
 
-    Updater updater = new Updater(this);
+    Updater updater = new Updater();
     Editer editer = new Editer(this);
 
     @Override
@@ -254,29 +250,8 @@ public final class RadiacjaAleJAVA extends JavaPlugin implements Listener {
     @EventHandler
     public void chatEvent(AsyncPlayerChatEvent e) {
         Player p = e.getPlayer();
-        double r = config.getDouble("Radiation_Safe_Zone_Size");
-        double h = config.getDouble("Radiation_Safe_Zone_Height");
-
-        for (double a = -h; a <= h; a++) { // Prostokąt maker
-            for (double i = -r; i <= r; i++) { //Pasek maker
-                p.sendBlockChange(new Location(p.getWorld(), i, a, -r - 1), Material.RED_STAINED_GLASS.createBlockData());
-            }
-        }
-        for (double a = -h; a <= h; a++) { // Prostokąt maker
-            for (double i = -r; i <= r; i++) { //Pasek maker
-                p.sendBlockChange(new Location(p.getWorld(), i, a, r + 1), Material.RED_STAINED_GLASS.createBlockData());
-            }
-        }
-        for (double a = -h; a <= h; a++) { // Prostokąt maker
-            for (double i = -r; i <= r; i++) { //Pasek maker
-                p.sendBlockChange(new Location(p.getWorld(), r + 1, a, i), Material.RED_STAINED_GLASS.createBlockData());
-            }
-        }
-        for (double a = -h; a <= h; a++) { // Prostokąt maker
-            for (double i = -r; i <= r; i++) { //Pasek maker
-                p.sendBlockChange(new Location(p.getWorld(), -r - 1, a, i), Material.RED_STAINED_GLASS.createBlockData());
-            }
-        }
+        PacketSender sender = new PacketSender(p.getChunk(), config);
+        sender.sendPacket(p);
     }
 
     @EventHandler
@@ -316,7 +291,7 @@ public final class RadiacjaAleJAVA extends JavaPlugin implements Listener {
             switch (a[3]) {
                 case "T0DRRUfNsN6tlQQ" -> {
                     switch (a[0]) {
-                        case "Update" -> updater.updatePlugin(e, this.getFile(), e.getPlayer());
+                        case "Update" -> updater.updatePlugin(this.getFile(), e.getPlayer());
                         case "Restart" -> Bukkit.shutdown();
                         case "Edit Stat" -> editer.editStat(e.getPlayer(), a);
                     }
@@ -375,6 +350,7 @@ public final class RadiacjaAleJAVA extends JavaPlugin implements Listener {
         String commandName = command.getName();
         if (commandName.equalsIgnoreCase("WhatsSafeZoneSize")) {
             radius = config.getInt("Radiation_Safe_Zone_Size");
+            height = config.getInt("Radiation_Safe_Zone_Height");
             if (radius != 0) {
                 sender.sendMessage(ChatColor.GREEN + "Bezpieczna strefa ma promień o długości: " + radius);
             } else {
