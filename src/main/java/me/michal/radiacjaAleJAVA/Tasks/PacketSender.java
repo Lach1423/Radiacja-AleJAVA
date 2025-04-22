@@ -53,9 +53,7 @@ public class PacketSender {
 
         packet.getSectionPositions().write(0, new BlockPosition((int) Math.ceil(r/16), y, z));//Chunk coordinates
 
-        for (int i = 0; i <256; i++) {
-            blockArray.add(WrappedBlockData.createData(Material.WHITE_STAINED_GLASS));
-        }
+        blockArray = addGlassToArray(blockArray);
 
         for (int he = 0; he < 16; he++) {
             for (int i = 0; i < 16; i++) {
@@ -72,9 +70,7 @@ public class PacketSender {
 
         packet.getSectionPositions().write(0, new BlockPosition(-(int) Math.ceil(r/16), (int) (p.getY()/16), chunk.getZ()));//Chunk coordinates
 
-        for (int i = 0; i <256; i++) {
-            blockArray.add(WrappedBlockData.createData(Material.RED_STAINED_GLASS));
-        }
+        blockArray = addGlassToArray(blockArray);
 
         for (int he = 0; he < 16; he++) {
             for (int i = 0; i < 16; i++) {
@@ -91,9 +87,7 @@ public class PacketSender {
 
         packet.getSectionPositions().write(0, new BlockPosition(chunk.getX(), (int) (p.getY()/16), (int) Math.ceil(r/16)));//Chunk coordinates
 
-        for (int i = 0; i <256; i++) {
-            blockArray.add(WrappedBlockData.createData(Material.RED_STAINED_GLASS));
-        }
+        blockArray = addGlassToArray(blockArray);
 
         for (int he = 0; he < 16; he++) {
             for (int i = 0; i < 16; i++) {
@@ -110,9 +104,7 @@ public class PacketSender {
 
         packet.getSectionPositions().write(0, new BlockPosition(chunk.getX(), (int) (p.getY()/16), -(int) Math.ceil(r/16)));//Chunk coordinates
 
-        for (int i = 0; i <256; i++) {
-            blockArray.add(WrappedBlockData.createData(Material.RED_STAINED_GLASS));
-        }
+        blockArray = addGlassToArray(blockArray);
 
         for (int he = 0; he < 16; he++) {
             for (int i = 0; i < 16; i++) {
@@ -141,6 +133,13 @@ public class PacketSender {
         packet.getShortArrays().writeSafely(0, blockLocations);
 
         return packet;
+    }
+
+    public ArrayList<WrappedBlockData> addGlassToArray(ArrayList<WrappedBlockData> blockArray) {
+        for (int i = 0; i <256; i++) {
+            blockArray.add(WrappedBlockData.createData(Material.WHITE_STAINED_GLASS));
+        }
+        return blockArray;
     }
 
     public void sendPackage(Player p, PacketContainer packet) {
