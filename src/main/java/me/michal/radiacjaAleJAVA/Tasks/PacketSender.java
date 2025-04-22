@@ -13,25 +13,28 @@ import org.bukkit.entity.Player;
 
 import java.lang.reflect.InvocationTargetException;
 import java.util.ArrayList;
+import java.util.stream.IntStream;
 
 public class PacketSender {
     Chunk chunk;
     FileConfiguration config;
-
-
+    double r;
+    double h;
 
     public PacketSender(Chunk chunk, FileConfiguration config) {
         this.chunk = chunk;
         this.config = config;
+        this.r = config.getDouble("Radiation_Safe_Zone_Size");
+        this.h = config.getDouble("Radiation_Safe_Zone_Height");
     }
 
-
     public void sendPacket(Player p) {
-        double r = config.getDouble("Radiation_Safe_Zone_Size");
-        double h = config.getDouble("Radiation_Safe_Zone_Height");
-
         if (chunk.getX() >= 0) {
-            sendPacketEast(p, r);
+            for (int he = -1; he < 2; he++) {
+                for (int i = -1; i < 2; i++) {
+                    sendPacketEast(p, (int) (p.getY()/16) + he, chunk.getZ() + i);
+                }
+            }
         } else {
             sendPacketWest(p, r);
         }
@@ -41,18 +44,17 @@ public class PacketSender {
         } else {
             sendPacketNorth(p, r);
         }
-
     }
 
-    public void sendPacketEast(Player p, double r) {
+    public void sendPacketEast(Player p, int y, int z) {
         PacketContainer packet  = new PacketContainer(PacketType.Play.Server.MULTI_BLOCK_CHANGE);
         ArrayList<WrappedBlockData> blockArray = new ArrayList<>();
         ArrayList<Short> locationArray = new ArrayList<>();
 
-        packet.getSectionPositions().write(0, new BlockPosition((int) Math.ceil(r/16), (int) (p.getY()/16), chunk.getZ()));//Chunk coordinates
+        packet.getSectionPositions().write(0, new BlockPosition((int) Math.ceil(r/16), y, z));//Chunk coordinates
 
         for (int i = 0; i <256; i++) {
-            blockArray.add(WrappedBlockData.createData(Material.RED_STAINED_GLASS));
+            blockArray.add(WrappedBlockData.createData(Material.WHITE_STAINED_GLASS));
         }
 
         for (int he = 0; he < 16; he++) {
