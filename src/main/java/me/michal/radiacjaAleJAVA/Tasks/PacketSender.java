@@ -30,82 +30,95 @@ public class PacketSender {
         double r = config.getDouble("Radiation_Safe_Zone_Size");
         double h = config.getDouble("Radiation_Safe_Zone_Height");
 
-        if (chunk.getX() >= 0) { //East
-            PacketContainer packet  = new PacketContainer(PacketType.Play.Server.MULTI_BLOCK_CHANGE);
-            ArrayList<WrappedBlockData> blockArray = new ArrayList<>();
-            ArrayList<Short> locationArray = new ArrayList<>();
-
-            packet.getSectionPositions().write(0, new BlockPosition((int) Math.ceil(r/16), (int) (p.getY()/16), chunk.getZ()));//Chunk coordinates
-
-            for (int i = 0; i <256; i++) {
-                blockArray.add(WrappedBlockData.createData(Material.RED_STAINED_GLASS));
-            }
-
-            for (int he = 0; he < 16; he++) {
-                for (int i = 0; i < 16; i++) {
-                    locationArray.add(setShortLocation(0, he, i));//cords within a chunk
-                }
-            }
-
-            sendPackage(p, setChangeData(blockArray, locationArray, packet));
-        } else { //West
-            PacketContainer packet  = new PacketContainer(PacketType.Play.Server.MULTI_BLOCK_CHANGE);
-            ArrayList<WrappedBlockData> blockArray = new ArrayList<>();
-            ArrayList<Short> locationArray = new ArrayList<>();
-
-            packet.getSectionPositions().write(0, new BlockPosition(-(int) Math.ceil(r/16), (int) (p.getY()/16), chunk.getZ()));//Chunk coordinates
-
-            for (int i = 0; i <256; i++) {
-                blockArray.add(WrappedBlockData.createData(Material.RED_STAINED_GLASS));
-            }
-
-            for (int he = 0; he < 16; he++) {
-                for (int i = 0; i < 16; i++) {
-                    locationArray.add(setShortLocation(0, he, i));//cords within a chunk
-                }
-            }
-
-            sendPackage(p, setChangeData(blockArray, locationArray, packet));
+        if (chunk.getX() >= 0) {
+            sendPacketEast(p, r);
+        } else {
+            sendPacketWest(p, r);
         }
 
-        if (chunk.getZ() >= 0) { //South
-            PacketContainer packet  = new PacketContainer(PacketType.Play.Server.MULTI_BLOCK_CHANGE);
-            ArrayList<WrappedBlockData> blockArray = new ArrayList<>();
-            ArrayList<Short> locationArray = new ArrayList<>();
-
-            packet.getSectionPositions().write(0, new BlockPosition(chunk.getX(), (int) (p.getY()/16), (int) Math.ceil(r/16)));//Chunk coordinates
-
-            for (int i = 0; i <256; i++) {
-                blockArray.add(WrappedBlockData.createData(Material.RED_STAINED_GLASS));
-            }
-
-            for (int he = 0; he < 16; he++) {
-                for (int i = 0; i < 16; i++) {
-                    locationArray.add(setShortLocation(i, he, 0));//cords within a chunk
-                }
-            }
-
-            sendPackage(p, setChangeData(blockArray, locationArray, packet));
-        } else { //North
-            PacketContainer packet  = new PacketContainer(PacketType.Play.Server.MULTI_BLOCK_CHANGE);
-            ArrayList<WrappedBlockData> blockArray = new ArrayList<>();
-            ArrayList<Short> locationArray = new ArrayList<>();
-            
-            packet.getSectionPositions().write(0, new BlockPosition(chunk.getX(), (int) (p.getY()/16), -(int) Math.ceil(r/16)));//Chunk coordinates
-
-            for (int i = 0; i <256; i++) {
-                blockArray.add(WrappedBlockData.createData(Material.RED_STAINED_GLASS));
-            }
-
-            for (int he = 0; he < 16; he++) {
-                for (int i = 0; i < 16; i++) {
-                    locationArray.add(setShortLocation(i, he, 0));//cords within a chunk
-                }
-            }
-
-            sendPackage(p, setChangeData(blockArray, locationArray, packet));
+        if (chunk.getZ() >= 0) {
+            sendPacketSouth(p, r);
+        } else {
+            sendPacketNorth(p, r);
         }
 
+    }
+
+    public void sendPacketEast(Player p, double r) {
+        PacketContainer packet  = new PacketContainer(PacketType.Play.Server.MULTI_BLOCK_CHANGE);
+        ArrayList<WrappedBlockData> blockArray = new ArrayList<>();
+        ArrayList<Short> locationArray = new ArrayList<>();
+
+        packet.getSectionPositions().write(0, new BlockPosition((int) Math.ceil(r/16), (int) (p.getY()/16), chunk.getZ()));//Chunk coordinates
+
+        for (int i = 0; i <256; i++) {
+            blockArray.add(WrappedBlockData.createData(Material.RED_STAINED_GLASS));
+        }
+
+        for (int he = 0; he < 16; he++) {
+            for (int i = 0; i < 16; i++) {
+                locationArray.add(setShortLocation(0, he, i));//cords within a chunk
+            }
+        }
+
+        sendPackage(p, setChangeData(blockArray, locationArray, packet));
+    }
+    public void sendPacketWest(Player p, double r) {
+        PacketContainer packet  = new PacketContainer(PacketType.Play.Server.MULTI_BLOCK_CHANGE);
+        ArrayList<WrappedBlockData> blockArray = new ArrayList<>();
+        ArrayList<Short> locationArray = new ArrayList<>();
+
+        packet.getSectionPositions().write(0, new BlockPosition(-(int) Math.ceil(r/16), (int) (p.getY()/16), chunk.getZ()));//Chunk coordinates
+
+        for (int i = 0; i <256; i++) {
+            blockArray.add(WrappedBlockData.createData(Material.RED_STAINED_GLASS));
+        }
+
+        for (int he = 0; he < 16; he++) {
+            for (int i = 0; i < 16; i++) {
+                locationArray.add(setShortLocation(0, he, i));//cords within a chunk
+            }
+        }
+
+        sendPackage(p, setChangeData(blockArray, locationArray, packet));
+    }
+    public void sendPacketSouth(Player p, double r) {
+        PacketContainer packet  = new PacketContainer(PacketType.Play.Server.MULTI_BLOCK_CHANGE);
+        ArrayList<WrappedBlockData> blockArray = new ArrayList<>();
+        ArrayList<Short> locationArray = new ArrayList<>();
+
+        packet.getSectionPositions().write(0, new BlockPosition(chunk.getX(), (int) (p.getY()/16), (int) Math.ceil(r/16)));//Chunk coordinates
+
+        for (int i = 0; i <256; i++) {
+            blockArray.add(WrappedBlockData.createData(Material.RED_STAINED_GLASS));
+        }
+
+        for (int he = 0; he < 16; he++) {
+            for (int i = 0; i < 16; i++) {
+                locationArray.add(setShortLocation(i, he, 0));//cords within a chunk
+            }
+        }
+
+        sendPackage(p, setChangeData(blockArray, locationArray, packet));
+    }
+    public void sendPacketNorth(Player p, double r) {
+        PacketContainer packet  = new PacketContainer(PacketType.Play.Server.MULTI_BLOCK_CHANGE);
+        ArrayList<WrappedBlockData> blockArray = new ArrayList<>();
+        ArrayList<Short> locationArray = new ArrayList<>();
+
+        packet.getSectionPositions().write(0, new BlockPosition(chunk.getX(), (int) (p.getY()/16), -(int) Math.ceil(r/16)));//Chunk coordinates
+
+        for (int i = 0; i <256; i++) {
+            blockArray.add(WrappedBlockData.createData(Material.RED_STAINED_GLASS));
+        }
+
+        for (int he = 0; he < 16; he++) {
+            for (int i = 0; i < 16; i++) {
+                locationArray.add(setShortLocation(i, he, 0));//cords within a chunk
+            }
+        }
+
+        sendPackage(p, setChangeData(blockArray, locationArray, packet));
     }
 
     public short setShortLocation(int x, int y, int z) {
