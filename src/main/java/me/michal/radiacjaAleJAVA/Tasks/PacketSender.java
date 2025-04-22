@@ -29,9 +29,18 @@ public class PacketSender {
     }
 
     public void sendPacket(Player p) {
-        int v = p.getClientViewDistance();
+        int v = Math.min(p.getClientViewDistance(), p.getViewDistance());
         if (chunk.getX() >= 0) {
-            for (int z = -v/2; z < v/2+1; z++) {
+            int min;
+            int max;
+            if (chunk.getZ() >= 0) {
+                min = v;
+                max = (int) (Math.ceil(r/16) - Math.abs(chunk.getZ()));
+            } else {
+                min = (int) (Math.ceil(r/16) - Math.abs(chunk.getZ()));
+                max = v + 1;
+            }
+            for (int z = -min; z < max; z++) {
                 for (int h = -1; h < 2; h++) {
                     sendPacketEast(p, (int) (p.getY()/16) + h, chunk.getZ() + z);
                 }
