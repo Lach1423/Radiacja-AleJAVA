@@ -263,18 +263,24 @@ public final class RadiacjaAleJAVA extends JavaPlugin implements Listener {
         int dz = rch - Math.abs(chZ);
         int v = Math.min(p.getClientViewDistance(), p.getViewDistance());
 
-        if (dx <= v && dz > v) {//  South/North
+        if (dz <= v && dx > v) {//  South/North
             for (int h = -2; h < 3; h++) {
-                for (int z = dx - v; z < -(dx - v) + 1; z++) {
-                    sender.sendPacketNorthSouth(p, (int) Math.signum(chX)*rch, pY + h, chZ + z);
+                for (int x = dz - v*3/2; x < -(dz - v*3/2) + 1; x++) {
+                    sender.sendPacketNorthSouth(p, chX + x, (pY/16) + h, (int) Math.signum(chZ)*rch);
                 }
             }
-        } else if (dz <= v && dx > v) {//   West/East
-                for (int h = -2; h < 3; h++) {
-                    for (int x = dz - v; x < -(dx - v) + 1; x++) {
-                        sender.sendPacketWestEast(p, chX + x ,pY + h, (int) Math.signum(chZ)*rch);
-                    }
+        } else if (dx <= v && dz > v) {//   West/East
+            for (int h = -2; h < 3; h++) {
+                p.sendMessage("------h: "+ h + " -------");
+                for (int z = dx - v*3/2; z < -(dx - v*3/2) + 1; z++) {
+                    int tx = (int) Math.signum(chX)*rch;
+                    int ty = (pY/16) + h;
+                    int tz = chZ + z;
+
+                    p.sendMessage("x: " + z + "    tx: " + tx + "   ty: " + ty + "   tz: " + tz);
+                    sender.sendPacketWestEast(p, tx ,ty, tz);
                 }
+            }
         } else if (dx <= v && dz <= v) {//  Both
             for (int h = -2; h < 3; h++) {
                 for (int z = rch - dx; z < v + 1; z++) {
