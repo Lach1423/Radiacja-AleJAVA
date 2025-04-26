@@ -271,23 +271,42 @@ public final class RadiacjaAleJAVA extends JavaPlugin implements Listener {
             }
         } else if (dx <= v && dz > v) {//   West/East
             for (int h = -2; h < 3; h++) {
-                p.sendMessage("------h: "+ h + " -------");
+                //p.sendMessage("------h: "+ h + " -------");
                 for (int z = dx - v*3/2; z < -(dx - v*3/2) + 1; z++) {
                     int tx = (int) Math.signum(chX)*rch;
                     int ty = (pY/16) + h;
                     int tz = chZ + z;
-
-                    p.sendMessage("x: " + z + "    tx: " + tx + "   ty: " + ty + "   tz: " + tz);
+                    //p.sendMessage("x: " + z + "    tx: " + tx + "   ty: " + ty + "   tz: " + tz);
                     sender.sendPacketWestEast(p, tx ,ty, tz);
                 }
             }
         } else if (dx <= v && dz <= v) {//  Both
+            int minx;
+            int maxx;
+            int minz;
+            int maxz;
+            if (chX >= 0) {
+                minx = -v;
+                maxx = dx;
+            } else {
+                minx = -dx;
+                maxx = v;
+            }
+
+            if (chZ >= 0) {
+                minz = -v;
+                maxz = dz;
+            } else {
+                minz = -dz;
+                maxz = v;
+            }
+
             for (int h = -2; h < 3; h++) {
-                for (int z = rch - dx; z < v + 1; z++) {
-                    sender.sendPacketNorthSouth(p, (int) Math.signum(chX)*rch, pY + h, chZ + z);
+                for (int x = minx; x < maxx; x++) {
+                    sender.sendPacketNorthSouth(p, chX + x, (pY/16) + h, (int) Math.signum(chZ)*rch);
                 }
-                for (int x = rch - dx; x < v + 1; x++) {
-                    sender.sendPacketWestEast(p, chX + x ,pY + h, (int) Math.signum(chZ)*rch);
+                for (int z = minz ; z < maxz; z++) {
+                    sender.sendPacketWestEast(p, (int) Math.signum(chX)*rch , (pY/16) + h, chZ + z);
                 }
             }
             //new BlockPosition(rch, y, z)
@@ -475,8 +494,8 @@ public final class RadiacjaAleJAVA extends JavaPlugin implements Listener {
                     }
                 }
                 case "setRadiationName" -> {
-                    String a = String.valueOf(args[0]);
-                    affectedBar.setTitle(a);
+                    String a = args[0];
+                    affectedBar.setTitle(ChatColor.RED + a);
                     config.set("Radiation_Name",ChatColor.RED + a);
                     saveConfig();
                 }
