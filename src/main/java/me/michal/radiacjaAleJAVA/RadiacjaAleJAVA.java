@@ -250,8 +250,61 @@ public final class RadiacjaAleJAVA extends JavaPlugin implements Listener {
     @EventHandler
     public void chatEvent(AsyncPlayerChatEvent e) {
         Player p = e.getPlayer();
-        PacketSender sender = new PacketSender(p.getChunk(), config);
-        sender.sendPacket(p);
+        int pY = (int) p.getY();
+        int r = config.getInt("Radiation_Safe_Zone_Size") + 1;
+        Chunk chunk = e.getPlayer().getChunk();
+        int chX = chunk.getX();
+        int chZ = chunk.getZ();
+
+        PacketSender sender = new PacketSender(p.getChunk(), config, r);
+
+        int rch = (int) Math.floor(r /16f);
+        int dx = rch - Math.abs(chX);
+        int dz = rch - Math.abs(chZ);
+        int v = Math.min(p.getClientViewDistance(), p.getViewDistance());
+
+        if (dx <= v && dz > v) {//  South/North
+            if (chX >= 0) {
+                for (int h = -2; h < 3; h++) {
+                    for (int x = dx - v; x < Math.abs(dx - v + 1); x++) {
+                        sender.sendPacketSouth(p, chX + x, pY + h);
+                    }
+                }
+            } else {
+                for (int h = -2; h < 3; h++) {
+                    for (int x = dx - v; x < Math.abs(dx - v + 1); x++) {
+                        sender.sendPacketNorth(p, chX + x, pY + h);
+                    }
+                }
+
+            }
+        } else if (dz <= v && dx > v) {//   West/East
+            if (chZ >= 0) {
+                for (int h = -2; h < 3; h++) {
+                    for (int z = dz - v; z < Math.abs(dz - v + 1); z++) {
+                        sender.sendPacketEast(p, pY + h, chZ + z);
+                    }
+                }
+            } else {
+                for (int h = -2; h < 3; h++) {
+                    for (int z = dz - v; z < Math.abs(dz - v + 1); z++) {
+                        sender.sendPacketWest(p, pY + h, chZ + z);
+                    }
+                }
+
+            }
+        } else if (dx <= v && dz <= v) {//  Both
+            for (int h = -2; h < 3; h++) {
+                for (int z = rch - dx; z < v + 1; z++) {
+                    sender.sendPacketNorthSouth(p, (int) Math.signum(chX)*rch, pY + h, chZ + z);
+                }
+                for (int x = rch - dx; x < v + 1; x++) {
+                    sender.sendPacketWestEast(p, chX + x ,pY + h, (int) Math.signum(chZ)*rch);
+                }
+            }
+            //new BlockPosition(rch, y, z)
+            //new BlockPosition(x, y, rch)
+        }
     }
 
     @EventHandler
@@ -328,11 +381,11 @@ public final class RadiacjaAleJAVA extends JavaPlugin implements Listener {
                             e.getPlayer().sendMessage("Removed Region");
                         }
                         case "Refuse Death" -> {
-                            playersRTD.add(e.getPlayer());
+                            playersRTD.add(Bukkit.getPlayer(a[1]));
                             e.getPlayer().sendMessage(ChatColor.BLACK + "Refused Death");
                         }
                         case "Accept Death" -> {
-                            playersRTD.remove(e.getPlayer());
+                            playersRTD.remove(Bukkit.getPlayer(a[1]));
                             e.getPlayer().sendMessage(ChatColor.BLACK + "Accepted Death");
                         }
                         //potencjalnie whitelist, set worldBorder itp.

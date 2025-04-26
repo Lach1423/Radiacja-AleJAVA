@@ -18,19 +18,34 @@ import java.util.stream.IntStream;
 public class PacketSender {
     Chunk chunk;
     FileConfiguration config;
-    double r;
+    int r;
     double h;
 
-    public PacketSender(Chunk chunk, FileConfiguration config) {
+    public PacketSender(Chunk chunk, FileConfiguration config, int r) {
         this.chunk = chunk;
         this.config = config;
-        this.r = config.getDouble("Radiation_Safe_Zone_Size");
+        this.r = r;
         this.h = config.getDouble("Radiation_Safe_Zone_Height");
     }
 
     public void sendPacket(Player p) {
         int v = Math.min(p.getClientViewDistance(), p.getViewDistance());
         if (chunk.getX() >= 0) {
+            int min;
+            int max;
+            if (chunk.getZ() >= 0) {
+                min = v;
+                max = (int) (Math.ceil(r/16) - chunk.getZ());
+            } else {
+                min = (int) (Math.ceil(r/16) + chunk.getZ());
+                max = v + 1;
+            }
+            for (int z = -min; z < max; z++) {
+                for (int h = -1; h < 2; h++) {
+                    sendPacketEast(p, (int) (p.getY()/16) + h, chunk.getZ() + z);
+                }
+            }
+        } else {
             int min;
             int max;
             if (chunk.getZ() >= 0) {
@@ -42,17 +57,43 @@ public class PacketSender {
             }
             for (int z = -min; z < max; z++) {
                 for (int h = -1; h < 2; h++) {
-                    sendPacketEast(p, (int) (p.getY()/16) + h, chunk.getZ() + z);
+                    sendPacketWest(p, (int) (p.getY()/16) + h, chunk.getZ() + z);
                 }
             }
-        } else {
-            sendPacketWest(p, r);
         }
 
         if (chunk.getZ() >= 0) {
-            sendPacketSouth(p, r);
+            int min;
+            int max;
+            if (chunk.getX() >= 0) {
+                min = v;
+                max = (int) (Math.ceil(r/16) - Math.abs(chunk.getZ()));
+            } else {
+                min = (int) (Math.ceil(r/16) - Math.abs(chunk.getZ())) + 1;
+                max = v;
+                p.sendMessage(min + " " + max);
+            }
+            for (int z = -min; z < max; z++) {
+                for (int h = -1; h < 2; h++) {
+                    sendPacketSouth(p, chunk.getX() + z, (int) (p.getY()/16) + h);
+                    p.sendMessage("Sented packet");
+                }
+            }
         } else {
-            sendPacketNorth(p, r);
+            int min;
+            int max;
+            if (chunk.getX() >= 0) {
+                min = v;
+                max = (int) (Math.ceil(r/16) - Math.abs(chunk.getX()));
+            } else {
+                min = (int) (Math.ceil(r/16) - Math.abs(chunk.getX()));
+                max = v + 1;
+            }
+            for (int z = -min; z < max; z++) {
+                for (int h = -1; h < 2; h++) {
+                    sendPacketNorth(p, (int) (p.getY()/16) + h, chunk.getX() + z);
+                }
+            }
         }
     }
 
@@ -73,12 +114,12 @@ public class PacketSender {
 
         sendPackage(p, setChangeData(blockArray, locationArray, packet));
     }
-    public void sendPacketWest(Player p, double r) {
+    public void sendPacketWest(Player p, int y, int z) {
         PacketContainer packet  = new PacketContainer(PacketType.Play.Server.MULTI_BLOCK_CHANGE);
         ArrayList<WrappedBlockData> blockArray = new ArrayList<>();
         ArrayList<Short> locationArray = new ArrayList<>();
 
-        packet.getSectionPositions().write(0, new BlockPosition(-(int) Math.ceil(r/16), (int) (p.getY()/16), chunk.getZ()));//Chunk coordinates
+        packet.getSectionPositions().write(0, new BlockPosition(-(int) Math.ceil(r/16), y, z));//Chunk coordinates
 
         blockArray = addGlassToArray(blockArray);
 
@@ -90,12 +131,12 @@ public class PacketSender {
 
         sendPackage(p, setChangeData(blockArray, locationArray, packet));
     }
-    public void sendPacketSouth(Player p, double r) {
+    public void sendPacketSouth(Player p, int x, int y) {
         PacketContainer packet  = new PacketContainer(PacketType.Play.Server.MULTI_BLOCK_CHANGE);
         ArrayList<WrappedBlockData> blockArray = new ArrayList<>();
         ArrayList<Short> locationArray = new ArrayList<>();
 
-        packet.getSectionPositions().write(0, new BlockPosition(chunk.getX(), (int) (p.getY()/16), (int) Math.ceil(r/16)));//Chunk coordinates
+        packet.getSectionPositions().write(0, new BlockPosition(x, y, (int) Math.ceil(r/16)));//Chunk coordinates
 
         blockArray = addGlassToArray(blockArray);
 
@@ -107,12 +148,12 @@ public class PacketSender {
 
         sendPackage(p, setChangeData(blockArray, locationArray, packet));
     }
-    public void sendPacketNorth(Player p, double r) {
+    public void sendPacketNorth(Player p, int x, int y) {
         PacketContainer packet  = new PacketContainer(PacketType.Play.Server.MULTI_BLOCK_CHANGE);
         ArrayList<WrappedBlockData> blockArray = new ArrayList<>();
         ArrayList<Short> locationArray = new ArrayList<>();
 
-        packet.getSectionPositions().write(0, new BlockPosition(chunk.getX(), (int) (p.getY()/16), -(int) Math.ceil(r/16)));//Chunk coordinates
+        packet.getSectionPositions().write(0, new BlockPosition(x, y, -(int) Math.ceil(r/16)));//Chunk coordinates
 
         blockArray = addGlassToArray(blockArray);
 
@@ -130,6 +171,42 @@ public class PacketSender {
         y = y & 0xF;
         z = z & 0xF;
         return (short) (x << 8 | z << 4 | y << 0);
+    }
+
+    public void sendPacketNorthSouth(Player p, int x, int y, int z) {
+        PacketContainer packet  = new PacketContainer(PacketType.Play.Server.MULTI_BLOCK_CHANGE);
+        ArrayList<WrappedBlockData> blockArray = new ArrayList<>();
+        ArrayList<Short> locationArray = new ArrayList<>();
+
+        packet.getSectionPositions().write(0, new BlockPosition(x, y, z));//Chunk coordinates
+
+        blockArray = addGlassToArray(blockArray);
+
+        for (int he = 0; he < 16; he++) {
+            for (int i = 0; i < 16; i++) {
+                locationArray.add(setShortLocation(i, he, r));//cords within a chunk
+            }
+        }
+
+        sendPackage(p, setChangeData(blockArray, locationArray, packet));
+    }
+
+    public void sendPacketWestEast(Player p, int x, int y, int z) {
+        PacketContainer packet  = new PacketContainer(PacketType.Play.Server.MULTI_BLOCK_CHANGE);
+        ArrayList<WrappedBlockData> blockArray = new ArrayList<>();
+        ArrayList<Short> locationArray = new ArrayList<>();
+
+        packet.getSectionPositions().write(0, new BlockPosition(x, y, z));//Chunk coordinates
+
+        blockArray = addGlassToArray(blockArray);
+
+        for (int he = 0; he < 16; he++) {
+            for (int i = 0; i < 16; i++) {
+                locationArray.add(setShortLocation(r, he, i));//cords within a chunk
+            }
+        }
+
+        sendPackage(p, setChangeData(blockArray, locationArray, packet));
     }
 
     public PacketContainer setChangeData(ArrayList<WrappedBlockData> blockDat, ArrayList<Short> blockPositions, PacketContainer packet) {
