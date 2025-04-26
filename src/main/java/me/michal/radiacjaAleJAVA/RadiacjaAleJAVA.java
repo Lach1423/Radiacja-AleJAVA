@@ -224,6 +224,26 @@ public final class RadiacjaAleJAVA extends JavaPlugin implements Listener {
         } else {
             onlinePlayers.put(p, p.getChunk());
         }
+        nearRadiation(p, chunk);
+    }
+
+    public void enterRegion(Player player) {
+        Location loc = player.getLocation();
+        BlockVector3 blockVector = BlockVector3.at(loc.getBlockX(), loc.getBlockY(), loc.getBlockZ());
+        RegionManager regions = WorldGuard.getInstance().getPlatform().getRegionContainer().get(BukkitAdapter.adapt(player.getWorld()));
+
+        if (regions != null) {
+            if (regions.getApplicableRegions(blockVector).size() == 0 && !affectedPlayers.contains(player)) {
+                affectedPlayers.add(player);
+                affectedBar.addPlayer(player);
+            } else if(regions.getApplicableRegions(blockVector).size() != 0 && affectedPlayers.contains(player)) {
+                affectedPlayers.remove(player);
+                affectedBar.removePlayer(player);
+            }
+        }
+    }
+
+    public void nearRadiation(Player p, Chunk chunk) {
         int pY = (int) p.getY();
         int r = config.getInt("Radiation_Safe_Zone_Size") + 1;
         int chX = chunk.getX();
@@ -287,31 +307,13 @@ public final class RadiacjaAleJAVA extends JavaPlugin implements Listener {
         }
     }
 
-    public void enterRegion(Player player) {
-        Location loc = player.getLocation();
-        BlockVector3 blockVector = BlockVector3.at(loc.getBlockX(), loc.getBlockY(), loc.getBlockZ());
-        RegionManager regions = WorldGuard.getInstance().getPlatform().getRegionContainer().get(BukkitAdapter.adapt(player.getWorld()));
-
-        if (regions != null) {
-            if (regions.getApplicableRegions(blockVector).size() == 0 && !affectedPlayers.contains(player)) {
-                affectedPlayers.add(player);
-                affectedBar.addPlayer(player);
-            } else if(regions.getApplicableRegions(blockVector).size() != 0 && affectedPlayers.contains(player)) {
-                affectedPlayers.remove(player);
-                affectedBar.removePlayer(player);
-            }
-        }
-    }
-
-    public void nearRadiation(Player p) {
-
-    }
-
     @EventHandler
     public void joinEvent(PlayerJoinEvent e) {
         Player p = e.getPlayer();
         onlinePlayers.put(p, p.getChunk());
+        nearRadiation(p, p.getChunk());
         UUID uuid = p.getUniqueId();
+
         if (offlinePlayers.containsKey(uuid)) {
             long startTime = System.currentTimeMillis() - offlinePlayers.get(uuid);
 
@@ -320,73 +322,6 @@ public final class RadiacjaAleJAVA extends JavaPlugin implements Listener {
             offlinePlayers.remove(uuid);
         }
         enterRegion(p);
-    }
-
-    @EventHandler
-    public void chatEvent(AsyncPlayerChatEvent e) {
-        Player p = e.getPlayer();
-        int pY = (int) p.getY();
-        int r = config.getInt("Radiation_Safe_Zone_Size") + 1;
-        Chunk chunk = e.getPlayer().getChunk();
-        int chX = chunk.getX();
-        int chZ = chunk.getZ();
-
-        PacketSender sender = new PacketSender(p.getChunk(), config, r);
-
-        int rch = (int) Math.floor(r /16f);
-        int dx = rch - Math.abs(chX);
-        int dz = rch - Math.abs(chZ);
-        int v = Math.min(p.getClientViewDistance(), p.getViewDistance());
-
-        if (dz <= v && dx > v) {//  South/North
-            for (int h = -5; h < 3; h++) {
-                for (int x = dz - v*3/2; x < -(dz - v*3/2) + 1; x++) {
-                    sender.sendPacketNorthSouth(p, chX + x, (pY/16) + h, (int) Math.signum(chZ)*rch);
-                }
-            }
-        } else if (dx <= v && dz > v) {//   West/East
-            for (int h = -5; h < 3; h++) {
-                //p.sendMessage("------h: "+ h + " -------");
-                for (int z = dx - v*3/2; z < -(dx - v*3/2) + 1; z++) {
-                    int tx = (int) Math.signum(chX)*rch;
-                    int ty = (pY/16) + h;
-                    int tz = chZ + z;
-                    //p.sendMessage("x: " + z + "    tx: " + tx + "   ty: " + ty + "   tz: " + tz);
-                    sender.sendPacketWestEast(p, tx ,ty, tz);
-                }
-            }
-        } else if (dx <= v && dz <= v) {//  Both
-            int minx;
-            int maxx;
-            int minz;
-            int maxz;
-            if (chX >= 0) {
-                minx = -v;
-                maxx = dx;
-            } else {
-                minx = -dx;
-                maxx = v;
-            }
-
-            if (chZ >= 0) {
-                minz = -v;
-                maxz = dz;
-            } else {
-                minz = -dz;
-                maxz = v;
-            }
-
-            for (int h = -5; h < 3; h++) {
-                for (int x = minx; x < maxx; x++) {
-                    sender.sendPacketNorthSouth(p, chX + x, (pY/16) + h, (int) Math.signum(chZ)*rch);
-                }
-                for (int z = minz ; z < maxz; z++) {
-                    sender.sendPacketWestEast(p, (int) Math.signum(chX)*rch , (pY/16) + h, chZ + z);
-                }
-            }
-            //new BlockPosition(rch, y, z)
-            //new BlockPosition(x, y, rch)
-        }
     }
 
     @EventHandler
