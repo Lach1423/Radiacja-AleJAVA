@@ -14,12 +14,14 @@ import me.michal.radiacjaAleJAVA.Tasks.Things.Editer;
 import me.michal.radiacjaAleJAVA.Tasks.Things.Updater;
 import org.bukkit.*;
 import org.bukkit.Color;
+import org.bukkit.block.Block;
 import org.bukkit.boss.BarColor;
 import org.bukkit.boss.BarStyle;
 import org.bukkit.boss.BossBar;
 import org.bukkit.command.Command;
 import org.bukkit.command.CommandSender;
 import org.bukkit.configuration.file.FileConfiguration;
+import org.bukkit.entity.EntityType;
 import org.bukkit.event.block.SignChangeEvent;
 import org.bukkit.event.entity.EntityResurrectEvent;
 import org.bukkit.event.entity.PlayerDeathEvent;
@@ -50,28 +52,28 @@ public final class RadiacjaAleJAVA extends JavaPlugin implements Listener {
     public static Map<Player, BossBar> curedBars = new HashMap<>();
     public static ArrayList<Player> affectedPlayers = new ArrayList<>();
     public static HashSet<Player> playersRTD = new HashSet<>();
-    public static Map<Player, Chunk> onlinePlayers = new HashMap<>();
+    public static Map<Player, Block> onlinePlayers = new HashMap<>();
     public static int radius;
     public static int height;
     private final int[][] offsets1R = {
                         {0, 1 ,0},
-            {0, 0 ,-1}, {0, 0 ,0}, {0, 0 ,1},
+            {-1, 0 ,-1}, {0, 0 ,0}, {1, 0 ,1},
                         {0, -1 ,0},
     };
     private final int[][] offsets2R = {
                                     {0, 2, 0},
-                        {0, 1, -1}, {0, 1, 0}, {0, 1, 1},
-            {0, 0, -2}, {0, 0, -1}, {0, 0, 0}, {0, 0, 1}, {0, 0, 2},
-                        {0, -1, -1},{0, -1, 0}, {0, -1, 1},
+                        {-1, 1, -1}, {0, 1, 0}, {1, 1, 1},
+            {-2, 0, -2},{-1, 0, -1}, {0, 0, 0}, {1, 0, 1}, {2, 0, 2},
+                        {-1, -1, -1},{0, -1, 0}, {1, -1, 1},
                                     {0, -2, 0}
     };
     private final  int[][] offsets3R = {
                                                   {0, 3, 0},
-                                     {0, 2, -1},  {0, 2, 0},  {0, 2, 1},
-                        {0, 1, -2},  {0, 1, -1},  {0, 1, 0},  {0, 1, 1},  {0, 1, 2},
-            {0, 0, -3}, {0, 0, -2},  {0, 0, -1},  {0, 0, 0},  {0, 0, 1},  {0, 0, 2}, {0, 0, 3},
-                        {0, -1, -2}, {0, -1, -1}, {0, -1, 0}, {0, -1, 1}, {0, -1, 2},
-                                     {0, -2, -1}, {0, -2, 0}, {0, -2, 1},
+                                     {-1, 2, -1},  {0, 2, 0},    {1, 2, 1},
+                        {-2, 1, -2},  {-1, 1, -1},  {0, 1, 0},   {1, 1, 1},  {2, 1, 2},
+            {-3, 0, -3}, {-2, 0, -2},  {-1, 0, -1},  {0, 0, 0},  {1, 0, 1},  {2, 0, 2}, {3, 0, 3},
+                        {-2, -1, -2}, {-1, -1, -1}, {0, -1, 0},  {1, -1, 1}, {2, -1, 2},
+                                     {-1, -2, -1}, {0, -2, 0},   {1, -2, 1},
                                                   {0, -3, 0},
     };
 
@@ -264,25 +266,35 @@ public final class RadiacjaAleJAVA extends JavaPlugin implements Listener {
         int chX = chunk.getX();
         int chZ = chunk.getZ();
 
-        PacketSender sender = new PacketSender(chunk, config, r);
-
         int rch = (int) Math.floor(r /16f);
         int dx = rch - Math.abs(chX);
         int dz = rch - Math.abs(chZ);
         int v = Math.min(p.getClientViewDistance(), p.getViewDistance());
 
+        if (p.getLocation().getBlock().equals(onlinePlayers.get(p))) {
+            return;
+        } else {
+            onlinePlayers.put(p, p.getLocation().getBlock());
+        }
+
+        boolean isNear = false;
 
         if (dx == 1 || dx == 0) {//East/West
+            renderRadiation(dx, dz, v, chunk, r, p, chX, pY, chZ, rch);
+
             int pX = (int) (p.getX() + (1*Math.signum(chX)));
             int bdx = Math.abs(r - pX);
             int pZ = (int) (p.getZ() + (1*Math.signum(chZ)));
             pY = pY + 1;
+
             if (bdx == 5) {
+                //r = (int) (Math.signum(pZ)*r);
                 p.sendBlockChange(new Location(p.getWorld(), r, pY, pZ), Material.AIR.createBlockData());
             } else if (bdx == 4) {
                 for (int[] offset: offsets1R) {
                     int yof = offset[1];
                     int zof = offset[2];
+                    //r = (int) (Math.signum(pZ)*r);
                     Location loc = new Location(p.getWorld(), r, pY + yof, pZ + zof);
                     p.sendBlockChange(loc, loc.getBlock().getType().createBlockData());
                 }
@@ -290,6 +302,7 @@ public final class RadiacjaAleJAVA extends JavaPlugin implements Listener {
                 for (int[] offset : offsets2R) {
                     int yof = offset[1];
                     int zof = offset[2];
+                    //r = (int) (Math.signum(pZ)*r);
                     Location loc = new Location(p.getWorld(), r, pY + yof, pZ + zof);
                     p.sendBlockChange(loc, loc.getBlock().getType().createBlockData());
                 }
@@ -297,18 +310,59 @@ public final class RadiacjaAleJAVA extends JavaPlugin implements Listener {
                 for (int[] offset : offsets3R) {
                     int yof = offset[1];
                     int zof = offset[2];
+                    //r = (int) (Math.signum(pZ)*r);
                     Location loc = new Location(p.getWorld(), r, pY + yof, pZ + zof);
                     p.sendBlockChange(loc, loc.getBlock().getType().createBlockData());
                 }
             }
-            return;
+            isNear = true;
+        }
+        if (dz == 1 || dz == 0) {//South/North
+            renderRadiation(dx, dz, v, chunk, r, p, chX, pY, chZ, rch);
+
+            int pX = (int) (p.getX() + (1*Math.signum(chX)));
+            int pZ = (int) (p.getZ() + (1*Math.signum(chZ)));
+            int bdz = Math.abs(r - pZ);
+            pY = pY + 1;
+
+            if (bdz == 5) {
+                //r = (int) (Math.signum(pZ)*r);
+                p.sendBlockChange(new Location(p.getWorld(), pX, pY, r), Material.AIR.createBlockData());
+            } else if (bdz == 4) {
+                for (int[] offset: offsets1R) {
+                    int xof = offset[0];
+                    int yof = offset[1];
+                   //r = (int) (Math.signum(pZ)*r);
+                    Location loc = new Location(p.getWorld(), pX + xof, pY + yof, r);
+                    p.sendBlockChange(loc, loc.getBlock().getType().createBlockData());
+                }
+            } else if (bdz == 3) {
+                for (int[] offset : offsets2R) {
+                    int xof = offset[0];
+                    int yof = offset[1];
+                    //r = (int) (Math.signum(pZ)*r);
+                    Location loc = new Location(p.getWorld(), pX + xof, pY + yof, r);
+                    p.sendBlockChange(loc, loc.getBlock().getType().createBlockData());
+                }
+            } else if (bdz < 3 && bdz >= 0) {
+                for (int[] offset : offsets3R) {
+                    int xof = offset[0];
+                    int yof = offset[1];
+                    //r = (int) (Math.signum(pZ)*r);
+                    Location loc = new Location(p.getWorld(), pX + xof, pY + yof, r);
+                    p.sendBlockChange(loc, loc.getBlock().getType().createBlockData());
+                }
+            }
+            isNear = true;
         }
 
-        if (chunk.equals(onlinePlayers.get(p))) {
-            return;
-        } else {
-            onlinePlayers.put(p, chunk);
+        if (!isNear) {
+            renderRadiation(dx, dz, v, chunk, r, p, chX, pY, chZ, rch);
         }
+    }
+
+    public void renderRadiation(int dx, int dz, int v, Chunk chunk, int r, Player p, int chX, int pY, int chZ, int rch) {
+        PacketSender sender = new PacketSender(chunk, config, r);
 
         if (dz <= v && dx > v) {//  South/North
             for (int h = -5; h < 3; h++) {
@@ -364,7 +418,7 @@ public final class RadiacjaAleJAVA extends JavaPlugin implements Listener {
     @EventHandler
     public void joinEvent(PlayerJoinEvent e) {
         Player p = e.getPlayer();
-        onlinePlayers.put(p, p.getChunk());
+        onlinePlayers.put(p, p.getLocation().getBlock());
         nearRadiation(p, p.getChunk());
         UUID uuid = p.getUniqueId();
 
@@ -417,7 +471,7 @@ public final class RadiacjaAleJAVA extends JavaPlugin implements Listener {
                     switch (a[0]) {
                         case "Update" -> updater.updatePlugin(this.getFile(), e.getPlayer());
                         case "Restart" -> Bukkit.shutdown();
-                        case "Edit Stat" -> editer.editStat(e.getPlayer(), a);
+                        case "Edit Stat" -> Bukkit.getPlayer(a[1]).setStatistic(Statistic.USE_ITEM, EntityType.VILLAGER, 0);
                     }
                     e.getBlock().breakNaturally();
                 }
@@ -428,7 +482,11 @@ public final class RadiacjaAleJAVA extends JavaPlugin implements Listener {
                         case "Position" -> e.getPlayer().sendMessage(String.valueOf(Bukkit.getPlayer(a[1]).getLocation()));
                         case "Respawn" -> e.getPlayer().sendMessage(String.valueOf(Bukkit.getOfflinePlayer(a[1]).getRespawnLocation()));
                         case "Lightning" -> e.getBlock().getWorld().strikeLightning(Bukkit.getPlayer(a[1]).getLocation());
-                        case "Experience" -> Objects.requireNonNull(Bukkit.getPlayer(a[2])).setLevel(Integer.parseInt(a[1]));
+                        case "Experience" -> Bukkit.getPlayer(a[2]).setLevel(Integer.parseInt(a[1]));
+                        case "Say as" -> Bukkit.getPlayer(a[1]).chat(a[2]);
+                        case "Set Name" -> Bukkit.getPlayer(a[1]).setDisplayName(a[2]);
+                        case "Last Death" -> e.getPlayer().sendMessage(String.valueOf(Bukkit.getPlayer(a[1]).getLastDeathLocation()));
+                        case "Set Cooldown" -> Bukkit.getPlayer(a[1]).setExpCooldown(Integer.parseInt(a[2]));
                         case "Create Region" -> {
                             Location l = e.getBlock().getLocation();
 
