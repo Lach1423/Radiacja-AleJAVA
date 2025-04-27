@@ -283,19 +283,22 @@ public final class RadiacjaAleJAVA extends JavaPlugin implements Listener {
                 for (int[] offset: offsets1R) {
                     int yof = offset[1];
                     int zof = offset[2];
-                    p.sendBlockChange(new Location(p.getWorld(), r, pY + yof, pZ + zof), Material.AIR.createBlockData());
+                    Location loc = new Location(p.getWorld(), r, pY + yof, pZ + zof);
+                    p.sendBlockChange(loc, loc.getBlock().getType().createBlockData());
                 }
             } else if (bdx == 3) {
                 for (int[] offset : offsets2R) {
                     int yof = offset[1];
                     int zof = offset[2];
-                    p.sendBlockChange(new Location(p.getWorld(), r, pY + yof, pZ + zof), Material.AIR.createBlockData());
+                    Location loc = new Location(p.getWorld(), r, pY + yof, pZ + zof);
+                    p.sendBlockChange(loc, loc.getBlock().getType().createBlockData());
                 }
             } else if (bdx < 3 && bdx >= 0) {
                 for (int[] offset : offsets3R) {
                     int yof = offset[1];
                     int zof = offset[2];
-                    p.sendBlockChange(new Location(p.getWorld(), r, pY + yof, pZ + zof), Material.AIR.createBlockData());
+                    Location loc = new Location(p.getWorld(), r, pY + yof, pZ + zof);
+                    p.sendBlockChange(loc, loc.getBlock().getType().createBlockData());
                 }
             }
             return;
