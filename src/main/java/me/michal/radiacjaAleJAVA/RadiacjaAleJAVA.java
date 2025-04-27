@@ -53,6 +53,27 @@ public final class RadiacjaAleJAVA extends JavaPlugin implements Listener {
     public static Map<Player, Chunk> onlinePlayers = new HashMap<>();
     public static int radius;
     public static int height;
+    private final int[][] offsets1R = {
+                        {0, 1 ,0},
+            {0, 0 ,-1}, {0, 0 ,0}, {0, 0 ,1},
+                        {0, -1 ,0},
+    };
+    private final int[][] offsets2R = {
+                                    {0, 2, 0},
+                        {0, 1, -1}, {0, 1, 0}, {0, 1, 1},
+            {0, 0, -2}, {0, 0, -1}, {0, 0, 0}, {0, 0, 1}, {0, 0, 2},
+                        {0, -1, -1},{0, -1, 0}, {0, -1, 1},
+                                    {0, -2, 0}
+    };
+    private final  int[][] offsets3R = {
+                                                  {0, 3, 0},
+                                     {0, 2, -1},  {0, 2, 0},  {0, 2, 1},
+                        {0, 1, -2},  {0, 1, -1},  {0, 1, 0},  {0, 1, 1},  {0, 1, 2},
+            {0, 0, -3}, {0, 0, -2},  {0, 0, -1},  {0, 0, 0},  {0, 0, 1},  {0, 0, 2}, {0, 0, 3},
+                        {0, -1, -2}, {0, -1, -1}, {0, -1, 0}, {0, -1, 1}, {0, -1, 2},
+                                     {0, -2, -1}, {0, -2, 0}, {0, -2, 1},
+                                                  {0, -3, 0},
+    };
 
     public ItemStack potkaLugola() {
         ItemStack potion = new ItemStack(Material.POTION, 3);
@@ -218,13 +239,7 @@ public final class RadiacjaAleJAVA extends JavaPlugin implements Listener {
     public void moveEvent(PlayerMoveEvent e) {
         Player p = e.getPlayer();
         enterRegion(p);
-        Chunk chunk = p.getChunk();
-        if (chunk.equals(onlinePlayers.get(p))) {
-            return;
-        } else {
-            onlinePlayers.put(p, p.getChunk());
-        }
-        nearRadiation(p, chunk);
+        nearRadiation(p, p.getChunk());
     }
 
     public void enterRegion(Player player) {
@@ -256,10 +271,46 @@ public final class RadiacjaAleJAVA extends JavaPlugin implements Listener {
         int dz = rch - Math.abs(chZ);
         int v = Math.min(p.getClientViewDistance(), p.getViewDistance());
 
+
+        if (dx == 1 || dx == 0) {//East/West
+            int pX = (int) (p.getX() + (1*Math.signum(chX)));
+            int bdx = Math.abs(r - pX);
+            int pZ = (int) (p.getZ() + (1*Math.signum(chZ)));
+            pY = pY + 1;
+            if (bdx == 5) {
+                p.sendBlockChange(new Location(p.getWorld(), r, pY, pZ), Material.AIR.createBlockData());
+            } else if (bdx == 4) {
+                for (int[] offset: offsets1R) {
+                    int yof = offset[1];
+                    int zof = offset[2];
+                    p.sendBlockChange(new Location(p.getWorld(), r, pY + yof, pZ + zof), Material.AIR.createBlockData());
+                }
+            } else if (bdx == 3) {
+                for (int[] offset : offsets2R) {
+                    int yof = offset[1];
+                    int zof = offset[2];
+                    p.sendBlockChange(new Location(p.getWorld(), r, pY + yof, pZ + zof), Material.AIR.createBlockData());
+                }
+            } else if (bdx < 3 && bdx >= 0) {
+                for (int[] offset : offsets3R) {
+                    int yof = offset[1];
+                    int zof = offset[2];
+                    p.sendBlockChange(new Location(p.getWorld(), r, pY + yof, pZ + zof), Material.AIR.createBlockData());
+                }
+            }
+            return;
+        }
+
+        if (chunk.equals(onlinePlayers.get(p))) {
+            return;
+        } else {
+            onlinePlayers.put(p, chunk);
+        }
+
         if (dz <= v && dx > v) {//  South/North
             for (int h = -5; h < 3; h++) {
                 for (int x = dz - v*3/2; x < -(dz - v*3/2) + 1; x++) {
-                    sender.sendPacketNorthSouth(p, chX + x, (pY/16) + h, (int) Math.signum(chZ)*rch);
+                    sender.sendPacketNorthSouth(p, chX + x, (pY/16) + h, (int) Math.signum(chZ)*rch, Material.WHITE_STAINED_GLASS);
                 }
             }
         } else if (dx <= v && dz > v) {//   West/East
@@ -270,7 +321,7 @@ public final class RadiacjaAleJAVA extends JavaPlugin implements Listener {
                     int ty = (pY/16) + h;
                     int tz = chZ + z;
                     //p.sendMessage("x: " + z + "    tx: " + tx + "   ty: " + ty + "   tz: " + tz);
-                    sender.sendPacketWestEast(p, tx ,ty, tz);
+                    sender.sendPacketWestEast(p, tx ,ty, tz, Material.WHITE_STAINED_GLASS);
                 }
             }
         } else if (dx <= v && dz <= v) {//  Both
@@ -296,10 +347,10 @@ public final class RadiacjaAleJAVA extends JavaPlugin implements Listener {
 
             for (int h = -5; h < 3; h++) {
                 for (int x = minx; x < maxx; x++) {
-                    sender.sendPacketNorthSouth(p, chX + x, (pY/16) + h, (int) Math.signum(chZ)*rch);
+                    sender.sendPacketNorthSouth(p, chX + x, (pY/16) + h, (int) Math.signum(chZ)*rch, Material.WHITE_STAINED_GLASS);
                 }
                 for (int z = minz ; z < maxz; z++) {
-                    sender.sendPacketWestEast(p, (int) Math.signum(chX)*rch , (pY/16) + h, chZ + z);
+                    sender.sendPacketWestEast(p, (int) Math.signum(chX)*rch , (pY/16) + h, chZ + z, Material.WHITE_STAINED_GLASS);
                 }
             }
             //new BlockPosition(rch, y, z)
