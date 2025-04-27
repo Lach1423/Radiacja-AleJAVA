@@ -1,7 +1,6 @@
 package me.michal.radiacjaAleJAVA.Tasks.Things;
 
 
-import me.michal.radiacjaAleJAVA.RadiacjaAleJAVA;
 import org.bukkit.Bukkit;
 import org.bukkit.ChatColor;
 import org.bukkit.entity.Player;
@@ -12,19 +11,14 @@ import java.net.URI;
 import java.net.URL;
 
 public class Updater {
-    private static RadiacjaAleJAVA plugin;
-    private static SignChangeEvent e;
     private static URL url;
     private static File updateFolder;
     private static File file;
     private static Player player;
 
-    public Updater(RadiacjaAleJAVA plugin) {
-        Updater.plugin = plugin;
-    }
+    public Updater() {}
 
-    public void updatePlugin(SignChangeEvent event, File file, Player p) {
-        Updater.e = event;
+    public void updatePlugin(File file, Player p) {
         Updater.updateFolder = Bukkit.getUpdateFolderFile();
         Updater.file = file;
         Updater.player = p;

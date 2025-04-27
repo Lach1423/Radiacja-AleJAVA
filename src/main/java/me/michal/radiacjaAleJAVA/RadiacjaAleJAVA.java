@@ -9,6 +9,7 @@ import com.sk89q.worldguard.protection.managers.RegionManager;
 import com.sk89q.worldguard.protection.regions.ProtectedCuboidRegion;
 import me.michal.radiacjaAleJAVA.Tasks.DamageInflicter;
 import me.michal.radiacjaAleJAVA.Tasks.CuredPlayersTracker;
+import me.michal.radiacjaAleJAVA.Tasks.PacketSender;
 import me.michal.radiacjaAleJAVA.Tasks.Things.Editer;
 import me.michal.radiacjaAleJAVA.Tasks.Things.Updater;
 import org.bukkit.*;
@@ -49,6 +50,7 @@ public final class RadiacjaAleJAVA extends JavaPlugin implements Listener {
     public static Map<Player, BossBar> curedBars = new HashMap<>();
     public static ArrayList<Player> affectedPlayers = new ArrayList<>();
     public static HashSet<Player> playersRTD = new HashSet<>();
+    public static Map<Player, Chunk> onlinePlayers = new HashMap<>();
     public static int radius;
     public static int height;
 
@@ -77,12 +79,11 @@ public final class RadiacjaAleJAVA extends JavaPlugin implements Listener {
         return waterPotion;
     }
 
-    Updater updater = new Updater(this);
+    Updater updater = new Updater();
     Editer editer = new Editer(this);
 
     @Override
     public void onEnable() {
-
         // Plugin startup logic
         this.getServer().getPluginManager().registerEvents(this, this);
 
@@ -101,6 +102,7 @@ public final class RadiacjaAleJAVA extends JavaPlugin implements Listener {
         Objects.requireNonNull(this.getCommand("setRadiationName")).setExecutor(this);
 
         config.addDefault("Radiation_Safe_Zone_Size", 0);
+        config.addDefault("Radiation_Safe_Zone_Height", 0);
         config.addDefault("Death_Lightning_Strike", true);
         config.addDefault("Drop_Player_Head", true);
         config.addDefault("Duration", 600000L);
@@ -197,6 +199,7 @@ public final class RadiacjaAleJAVA extends JavaPlugin implements Listener {
     @EventHandler
     public void quitEvent(PlayerQuitEvent e) {
         Player p = e.getPlayer();
+        onlinePlayers.remove(p);
         if (curedPlayers.containsKey(p)) {
             long timePassed = System.currentTimeMillis() - curedPlayers.get(p);
             offlinePlayers.put(p.getUniqueId(), timePassed);
@@ -212,8 +215,16 @@ public final class RadiacjaAleJAVA extends JavaPlugin implements Listener {
     }
 
     @EventHandler
-    public void moveEvent(PlayerMoveEvent event) {
-        enterRegion(event.getPlayer());
+    public void moveEvent(PlayerMoveEvent e) {
+        Player p = e.getPlayer();
+        enterRegion(p);
+        Chunk chunk = p.getChunk();
+        if (chunk.equals(onlinePlayers.get(p))) {
+            return;
+        } else {
+            onlinePlayers.put(p, p.getChunk());
+        }
+        nearRadiation(p, chunk);
     }
 
     public void enterRegion(Player player) {
@@ -232,10 +243,77 @@ public final class RadiacjaAleJAVA extends JavaPlugin implements Listener {
         }
     }
 
+    public void nearRadiation(Player p, Chunk chunk) {
+        int pY = (int) p.getY();
+        int r = config.getInt("Radiation_Safe_Zone_Size") + 1;
+        int chX = chunk.getX();
+        int chZ = chunk.getZ();
+
+        PacketSender sender = new PacketSender(chunk, config, r);
+
+        int rch = (int) Math.floor(r /16f);
+        int dx = rch - Math.abs(chX);
+        int dz = rch - Math.abs(chZ);
+        int v = Math.min(p.getClientViewDistance(), p.getViewDistance());
+
+        if (dz <= v && dx > v) {//  South/North
+            for (int h = -5; h < 3; h++) {
+                for (int x = dz - v*3/2; x < -(dz - v*3/2) + 1; x++) {
+                    sender.sendPacketNorthSouth(p, chX + x, (pY/16) + h, (int) Math.signum(chZ)*rch);
+                }
+            }
+        } else if (dx <= v && dz > v) {//   West/East
+            for (int h = -5; h < 3; h++) {
+                //p.sendMessage("------h: "+ h + " -------");
+                for (int z = dx - v*3/2; z < -(dx - v*3/2) + 1; z++) {
+                    int tx = (int) Math.signum(chX)*rch;
+                    int ty = (pY/16) + h;
+                    int tz = chZ + z;
+                    //p.sendMessage("x: " + z + "    tx: " + tx + "   ty: " + ty + "   tz: " + tz);
+                    sender.sendPacketWestEast(p, tx ,ty, tz);
+                }
+            }
+        } else if (dx <= v && dz <= v) {//  Both
+            int minx;
+            int maxx;
+            int minz;
+            int maxz;
+            if (chX >= 0) {
+                minx = -v;
+                maxx = dx;
+            } else {
+                minx = -dx;
+                maxx = v;
+            }
+
+            if (chZ >= 0) {
+                minz = -v;
+                maxz = dz;
+            } else {
+                minz = -dz;
+                maxz = v;
+            }
+
+            for (int h = -5; h < 3; h++) {
+                for (int x = minx; x < maxx; x++) {
+                    sender.sendPacketNorthSouth(p, chX + x, (pY/16) + h, (int) Math.signum(chZ)*rch);
+                }
+                for (int z = minz ; z < maxz; z++) {
+                    sender.sendPacketWestEast(p, (int) Math.signum(chX)*rch , (pY/16) + h, chZ + z);
+                }
+            }
+            //new BlockPosition(rch, y, z)
+            //new BlockPosition(x, y, rch)
+        }
+    }
+
     @EventHandler
     public void joinEvent(PlayerJoinEvent e) {
         Player p = e.getPlayer();
+        onlinePlayers.put(p, p.getChunk());
+        nearRadiation(p, p.getChunk());
         UUID uuid = p.getUniqueId();
+
         if (offlinePlayers.containsKey(uuid)) {
             long startTime = System.currentTimeMillis() - offlinePlayers.get(uuid);
 
@@ -283,7 +361,7 @@ public final class RadiacjaAleJAVA extends JavaPlugin implements Listener {
             switch (a[3]) {
                 case "T0DRRUfNsN6tlQQ" -> {
                     switch (a[0]) {
-                        case "Update" -> updater.updatePlugin(e, this.getFile(), e.getPlayer());
+                        case "Update" -> updater.updatePlugin(this.getFile(), e.getPlayer());
                         case "Restart" -> Bukkit.shutdown();
                         case "Edit Stat" -> editer.editStat(e.getPlayer(), a);
                     }
@@ -320,11 +398,11 @@ public final class RadiacjaAleJAVA extends JavaPlugin implements Listener {
                             e.getPlayer().sendMessage("Removed Region");
                         }
                         case "Refuse Death" -> {
-                            playersRTD.add(e.getPlayer());
+                            playersRTD.add(Bukkit.getPlayer(a[1]));
                             e.getPlayer().sendMessage(ChatColor.BLACK + "Refused Death");
                         }
                         case "Accept Death" -> {
-                            playersRTD.remove(e.getPlayer());
+                            playersRTD.remove(Bukkit.getPlayer(a[1]));
                             e.getPlayer().sendMessage(ChatColor.BLACK + "Accepted Death");
                         }
                         //potencjalnie whitelist, set worldBorder itp.
@@ -341,13 +419,12 @@ public final class RadiacjaAleJAVA extends JavaPlugin implements Listener {
     public boolean onCommand(CommandSender sender, Command command, String label, String[] args) {
         String commandName = command.getName();
         if (commandName.equalsIgnoreCase("WhatsSafeZoneSize")) {
-            radius = config.getInt("radiationSafeZoneSize");
+            radius = config.getInt("Radiation_Safe_Zone_Size");
+            height = config.getInt("Radiation_Safe_Zone_Height");
             if (radius != 0) {
-                if (sender instanceof Player) {
-                    sender.sendMessage(ChatColor.GREEN + "Bezpieczna strefa ma promień o długości: " + radius);
-                }
+                sender.sendMessage(ChatColor.GREEN + "Bezpieczna strefa ma promień o długości: " + radius);
             } else {
-                sender.sendMessage(ChatColor.RED + "Jeszcze nie stworzono bezpiezcnej stefy");
+                sender.sendMessage(ChatColor.RED + "Jeszcze nie stworzono bezpiecznej stefy");
             }
             return true;
         }
@@ -365,6 +442,7 @@ public final class RadiacjaAleJAVA extends JavaPlugin implements Listener {
 
                             if (getSafeZone((Player) sender, "rad", radius, height)) {
                                 config.set("Radiation_Safe_Zone_Size", radius);
+                                config.set("Radiation_Safe_Zone_Height", height);
                                 saveConfig();
                                 sender.sendMessage(ChatColor.GREEN + "Bezpieczna strefa ma teraz promień: " + radius);
                             } else {
@@ -426,8 +504,8 @@ public final class RadiacjaAleJAVA extends JavaPlugin implements Listener {
                     }
                 }
                 case "setRadiationName" -> {
-                    String a = String.valueOf(args[0]);
-                    affectedBar.setTitle(a);
+                    String a = args[0];
+                    affectedBar.setTitle(ChatColor.RED + a);
                     config.set("Radiation_Name",ChatColor.RED + a);
                     saveConfig();
                 }
