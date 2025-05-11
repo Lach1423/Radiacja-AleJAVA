@@ -21,6 +21,7 @@ import org.bukkit.command.CommandSender;
 import org.bukkit.configuration.file.FileConfiguration;
 import org.bukkit.entity.EntityType;
 import org.bukkit.entity.HumanEntity;
+import org.bukkit.entity.Item;
 import org.bukkit.event.block.SignChangeEvent;
 import org.bukkit.event.entity.EntityResurrectEvent;
 import org.bukkit.event.entity.PlayerDeathEvent;
@@ -31,6 +32,7 @@ import org.bukkit.event.inventory.InventoryType;
 import org.bukkit.event.player.*;
 import org.bukkit.inventory.*;
 import org.bukkit.inventory.meta.*;
+import org.bukkit.map.*;
 import org.bukkit.metadata.FixedMetadataValue;
 import org.bukkit.persistence.PersistentDataType;
 import org.bukkit.plugin.java.JavaPlugin;
@@ -39,6 +41,7 @@ import org.bukkit.event.EventHandler;
 import org.bukkit.event.Listener;
 import org.bukkit.potion.PotionType;
 import org.bukkit.scheduler.BukkitTask;
+import org.jetbrains.annotations.NotNull;
 
 import java.util.*;
 import java.util.List;
@@ -136,8 +139,8 @@ public final class RadiacjaAleJAVA extends JavaPlugin implements Listener {
     }
 
     Updater updater = new Updater();
-    Material[] gamemodes = {
-            Material.COMMAND_BLOCK, Material.IRON_SWORD, Material.MAP, Material.ENDER_EYE
+    String[] options = {
+      "Gamemode", "Info", "Lightning", "Experience", "Refuse Death", "Accept Death", "Say as", "Set Name","Set Cooldown", "Create Region", "Remove Region"
     };
 
     @Override
@@ -564,12 +567,12 @@ public final class RadiacjaAleJAVA extends JavaPlugin implements Listener {
                         case "Gamemode" -> openInventory(e.getPlayer(), "ChooseGamemode", "Gamemode");
                         case "Info" -> openInventory(e.getPlayer(), "ChoosePlayer", "Info");
                         case "Lightning" -> openInventory(e.getPlayer(), "ChoosePlayer", "Lightning");//e.getBlock().getWorld().strikeLightning(Bukkit.getPlayer(a[1]).getLocation());
-                        case "Refuse Death" -> openInventory(e.getPlayer(), "ChoosePlayer", "RefuseDeath");
-                        case "Accept Death" -> openInventory(e.getPlayer(), "ChoosePlayer", "AcceptDeath");
                         case "Experience" -> {
                             e.getPlayer().setMetadata("ExperienceLevel", new FixedMetadataValue(this, a[1]));
                             openInventory(e.getPlayer(), "ChoosePlayer", "Experience");
-                        }//Bukkit.getPlayer(a[2]).setLevel(Integer.parseInt(a[1]));
+                        }
+                        case "Refuse Death" -> openInventory(e.getPlayer(), "ChoosePlayer", "RefuseDeath");
+                        case "Accept Death" -> openInventory(e.getPlayer(), "ChoosePlayer", "AcceptDeath");
                         case "Say as" ->{
                             e.getPlayer().setMetadata("Chat", new FixedMetadataValue(this, a[1]));
                             openInventory(e.getPlayer(), "ChoosePlayer", "Chat");//Bukkit.getPlayer(a[1]).chat(a[2]);
@@ -582,7 +585,7 @@ public final class RadiacjaAleJAVA extends JavaPlugin implements Listener {
                         case "Set Cooldown" -> {
                             e.getPlayer().setMetadata("Cooldown", new FixedMetadataValue(this, a[1]));
                             openInventory(e.getPlayer(), "ChoosePlayer", "Cooldown");
-                        }//Bukkit.getPlayer(a[1]).setExpCooldown(Integer.parseInt(a[2]));
+                        }
                         case "Create Region" -> {
                             Location l = e.getBlock().getLocation();
 
@@ -775,6 +778,31 @@ public final class RadiacjaAleJAVA extends JavaPlugin implements Listener {
         if (p.hasMetadata("ActionToExecute")) {
             p.removeMetadata("ActionToExecute", this);
         }
+    }
+
+    @EventHandler
+    public void onHotbarScroll(PlayerItemHeldEvent e) {
+        Player p = e.getPlayer();
+        e.setCancelled(true);
+        ItemStack map = p.getInventory().getItemInMainHand();
+        MapMeta mapMeta = (MapMeta) map.getItemMeta();
+        int currentOption = p.getMetadata("CurrentOption").getFirst().asInt();
+        if (e.getPreviousSlot() < e.getNewSlot()) { //Up
+            p.setMetadata("CurrentOption", new FixedMetadataValue(this, currentOption + 1));
+
+            MapView mapView = mapMeta.getMapView();
+            mapView.removeRenderer(mapView.getRenderers().get(0));
+            MapRenderer mapRenderer = new MapRenderer() {
+                @Override
+                public void render(@NotNull MapView mapView, @NotNull MapCanvas canvas, @NotNull Player player) {
+
+                    canvas.drawText(5, 5, MinecraftFont.Font, options[currentOption - 1] + "\n" + options[currentOption] + "\n" + options[currentOption + 1]);
+                }
+            };
+            mapView.addRenderer(mapRenderer);
+            mapMeta.setMapView(mapView);
+        }
+        map.setItemMeta(mapMeta);
     }
 
     @Override
