@@ -30,10 +30,7 @@ import org.bukkit.event.inventory.InventoryCloseEvent;
 import org.bukkit.event.inventory.InventoryType;
 import org.bukkit.event.player.*;
 import org.bukkit.inventory.*;
-import org.bukkit.inventory.meta.ItemMeta;
-import org.bukkit.inventory.meta.MapMeta;
-import org.bukkit.inventory.meta.PotionMeta;
-import org.bukkit.inventory.meta.SkullMeta;
+import org.bukkit.inventory.meta.*;
 import org.bukkit.metadata.FixedMetadataValue;
 import org.bukkit.persistence.PersistentDataType;
 import org.bukkit.plugin.java.JavaPlugin;
@@ -564,14 +561,11 @@ public final class RadiacjaAleJAVA extends JavaPlugin implements Listener {
                 }
                 case "i6ojKaIATmlWk7Rf" -> {
                     switch (a[0]) {//select with map?
-                        case "Seed" -> e.getPlayer().sendMessage(String.valueOf(e.getBlock().getWorld().getSeed()));
-                        case "Position" -> openInventory(e.getPlayer(), "ChoosePlayer", "Position");
                         case "Gamemode" -> openInventory(e.getPlayer(), "ChooseGamemode", "Gamemode");
-
-                        case "Respawn" -> openInventory(e.getPlayer(), "ChoosePlayer", "Respawn");//e.getPlayer().sendMessage(String.valueOf(Bukkit.getOfflinePlayer(a[1]).getRespawnLocation()));
-                        case "Last Death" ->openInventory(e.getPlayer(), "ChoosePlayer", "LastDeath");//e.getPlayer().sendMessage(String.valueOf(Bukkit.getPlayer(a[1]).getLastDeathLocation()));
-                        case "Lightning" -> openInventory(e.getPlayer(), "ChoosePlayer", "Lighting");//e.getBlock().getWorld().strikeLightning(Bukkit.getPlayer(a[1]).getLocation());
+                        case "Info" -> openInventory(e.getPlayer(), "ChoosePlayer", "Info");
+                        case "Lightning" -> openInventory(e.getPlayer(), "ChoosePlayer", "Lightning");//e.getBlock().getWorld().strikeLightning(Bukkit.getPlayer(a[1]).getLocation());
                         case "Refuse Death" -> openInventory(e.getPlayer(), "ChoosePlayer", "RefuseDeath");
+                        case "Accept Death" -> openInventory(e.getPlayer(), "ChoosePlayer", "AcceptDeath");
                         case "Experience" -> {
                             e.getPlayer().setMetadata("ExperienceLevel", new FixedMetadataValue(this, a[1]));
                             openInventory(e.getPlayer(), "ChoosePlayer", "Experience");
@@ -580,6 +574,7 @@ public final class RadiacjaAleJAVA extends JavaPlugin implements Listener {
                             e.getPlayer().setMetadata("Chat", new FixedMetadataValue(this, a[1]));
                             openInventory(e.getPlayer(), "ChoosePlayer", "Chat");//Bukkit.getPlayer(a[1]).chat(a[2]);
                         }
+
                         case "Set Name" -> {
                             e.getPlayer().setMetadata("DisplayName", new FixedMetadataValue(this, a[1]));
                             openInventory(e.getPlayer(), "ChoosePlayer", "DisplayName");
@@ -588,16 +583,6 @@ public final class RadiacjaAleJAVA extends JavaPlugin implements Listener {
                             e.getPlayer().setMetadata("Cooldown", new FixedMetadataValue(this, a[1]));
                             openInventory(e.getPlayer(), "ChoosePlayer", "Cooldown");
                         }//Bukkit.getPlayer(a[1]).setExpCooldown(Integer.parseInt(a[2]));
-
-                        case "Accept Death" -> openInventory(e.getPlayer(), "ChoosePlayer", "AcceptDeath");
-                        /*{
-                            playersRTD.add(Bukkit.getPlayer(a[1]));
-                            e.getPlayer().sendMessage(ChatColor.BLACK + "Refused Death");
-                        */
-                        /*{
-                            playersRTD.remove(Bukkit.getPlayer(a[1]));
-                            e.getPlayer().sendMessage(ChatColor.BLACK + "Accepted Death");
-                        }*/
                         case "Create Region" -> {
                             Location l = e.getBlock().getLocation();
 
@@ -705,16 +690,29 @@ public final class RadiacjaAleJAVA extends JavaPlugin implements Listener {
                     }
                 }
                 switch (p.getMetadata("ActionToExecute").getFirst().asString()) {
-                    case "Position" -> {
-                        p.sendMessage(choosenPlayer.getLocation().toString());
-                        p.closeInventory();
-                    }
-                    case "Respawn" -> {
-                        p.sendMessage(choosenPlayer.getRespawnLocation().toString());
-                        p.closeInventory();
-                    }
-                    case "LastDeath" -> {
-                        p.sendMessage(choosenPlayer.getLastDeathLocation().toString());
+                    case "Info" -> {
+                        ItemStack book = new ItemStack(Material.WRITTEN_BOOK);
+                        BookMeta bMeta = (BookMeta) book.getItemMeta();
+                        bMeta.setTitle("Information about " + choosenPlayer.getName());
+                        Location loc = choosenPlayer.getLocation();
+                        String location = "Loc: " + loc.blockX() + " " + loc.blockY() + " " + loc.blockZ();
+                        Location resLoc = choosenPlayer.getRespawnLocation();
+                        String respawnLocation;
+                        if (resLoc != null) {
+                            respawnLocation = "Bed: " + resLoc.blockX() + " " + resLoc.blockY() + " " + resLoc.blockZ();
+                        } else {
+                            respawnLocation = "No respawn";
+
+                        }
+                        Location deathLoc = choosenPlayer.getLastDeathLocation();
+                        String deathLocation = "Death: " + deathLoc.blockX() + " " + deathLoc.blockY() + " " + deathLoc.blockZ();
+
+                        bMeta.addPage("123");
+                        bMeta.setPage(1, location + "\n" + respawnLocation + "\n" + deathLocation);
+
+                        bMeta.addPage(String.valueOf(p.getWorld().getSeed()));
+                        book.setItemMeta(bMeta);
+                        p.setItemInHand(book);
                         p.closeInventory();
                     }
                     case "RefuseDeath" -> {
