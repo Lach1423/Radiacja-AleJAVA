@@ -10,11 +10,9 @@ import com.sk89q.worldguard.protection.regions.ProtectedCuboidRegion;
 import me.michal.radiacjaAleJAVA.Tasks.DamageInflicter;
 import me.michal.radiacjaAleJAVA.Tasks.CuredPlayersTracker;
 import me.michal.radiacjaAleJAVA.Tasks.PacketSender;
-import me.michal.radiacjaAleJAVA.Tasks.Things.Editer;
 import me.michal.radiacjaAleJAVA.Tasks.Things.Updater;
 import org.bukkit.*;
 import org.bukkit.Color;
-import org.bukkit.block.Block;
 import org.bukkit.boss.BarColor;
 import org.bukkit.boss.BarStyle;
 import org.bukkit.boss.BossBar;
@@ -41,6 +39,8 @@ import org.bukkit.scheduler.BukkitTask;
 
 import java.util.*;
 import java.util.List;
+
+import static me.michal.radiacjaAleJAVA.Tasks.PacketSender.*;
 
 public final class RadiacjaAleJAVA extends JavaPlugin implements Listener {
     FileConfiguration config = this.getConfig();
@@ -293,20 +293,20 @@ public final class RadiacjaAleJAVA extends JavaPlugin implements Listener {
     public void nearRadiation(Player p, Chunk chunk) {
         int pY = (int) p.getY();
         int r = config.getInt("Radiation_Safe_Zone_Size") + 1;
-        int chX = chunk.getX();
+        int playerChunkX = chunk.getX();
         int chZ = chunk.getZ();
 
         int rch = (int) Math.floor(r /16f);
-        int dx = rch - Math.abs(chX);
-        int dz = rch - Math.abs(chZ);
-        int v = Math.min(p.getClientViewDistance(), p.getViewDistance());
+        int dx = rch - Math.abs(playerChunkX);
+        int distanceToWallZ = rch - Math.abs(chZ);
+        int viewDistance = Math.min(p.getClientViewDistance(), p.getViewDistance());
 
 
         boolean isNear = false;
 
         if (curedPlayers.containsKey(p) && (dx == 1 || dx == 0)) {//East/West
 
-            int pX = (int) (p.getX() + (1*Math.signum(chX)));
+            int pX = (int) (p.getX() + (1*Math.signum(playerChunkX)));
             int bdx = Math.abs(r - pX);
             int pZ = (int) (p.getZ() + (1*Math.signum(chZ)));
             pY = pY + 1;
@@ -363,9 +363,9 @@ public final class RadiacjaAleJAVA extends JavaPlugin implements Listener {
                 isNear = true;
             }
         }
-        if (curedPlayers.containsKey(p) && (dz == 1 || dz == 0)){//South/North
+        if (curedPlayers.containsKey(p) && (distanceToWallZ == 1 || distanceToWallZ == 0)){//South/North
 
-            int pX = (int) (p.getX() + (1*Math.signum(chX)));
+            int pX = (int) (p.getX() + (1*Math.signum(playerChunkX)));
             int pZ = (int) (p.getZ() + (1*Math.signum(chZ)));
             int bdz = Math.abs(r - pZ);
             pY = pY + 1;
@@ -428,55 +428,55 @@ public final class RadiacjaAleJAVA extends JavaPlugin implements Listener {
         } else {
             onlinePlayers.put(p, p.getChunk());
         }
-        renderRadiation(dx, dz, v, chunk, r, p, chX, pY, chZ, rch);
+        renderRadiation(dx, distanceToWallZ, viewDistance, chunk, r, p, playerChunkX, pY, chZ, rch);
     }
 
-    public void renderRadiation(int dx, int dz, int v, Chunk chunk, int r, Player p, int chX, int pY, int chZ, int rch) {
+    public void renderRadiation(int dx, int distanceToWallZ, int viewDistance, Chunk chunk, int r, Player p, int playerChunkX, int pY, int chZ, int rch) {
         PacketSender sender = new PacketSender(chunk, config, r);
-        if (dz <= v && dx > v) {//  South/North
+        if (distanceToWallZ <= viewDistance && dx > viewDistance) {//  South/North
             for (int h = -5; h < 3; h++) {
-                for (int x = dz - v*3/2; x < -(dz - v*3/2) + 1; x++) {
-                    sender.sendPacketNorthSouth(p, chX + x, (pY/16) + h, (int) Math.signum(chZ)*rch, Material.WHITE_STAINED_GLASS);
+                for (int x = distanceToWallZ - viewDistance*3/2; x < -(distanceToWallZ - viewDistance*3/2) + 1; x++) {
+                    sender.writeChunkCoordinatesIntoPacket(p, templatePacketZAxis ,playerChunkX + x, (pY/16) + h, (int) Math.signum(chZ)*rch);
                 }
             }
-        } else if (dx <= v && dz > v) {//   West/East
+        } else if (dx <= viewDistance && distanceToWallZ > viewDistance) {//   West/East
             for (int h = -5; h < 3; h++) {
                 //p.sendMessage("------h: "+ h + " -------");
-                for (int z = dx - v*3/2; z < -(dx - v*3/2) + 1; z++) {
-                    int tx = (int) Math.signum(chX)*rch;
-                    int ty = (pY/16) + h;
-                    int tz = chZ + z;
+                for (int z = dx - viewDistance*3/2; z < -(dx - viewDistance*3/2) + 1; z++) {
+                    int packetX = (int) Math.signum(playerChunkX)*rch;
+                    int packetY = (pY/16) + h;
+                    int packetZ = chZ + z;
                     //p.sendMessage("x: " + z + "    tx: " + tx + "   ty: " + ty + "   tz: " + tz);
-                    sender.sendPacketWestEast(p, tx ,ty, tz, Material.WHITE_STAINED_GLASS);
+                    sender.writeChunkCoordinatesIntoPacket(p, templatePacketZAxis, packetX ,packetY, packetZ);
                 }
             }
-        } else if (dx <= v && dz <= v) {//  Both
+        } else if (dx <= viewDistance && distanceToWallZ <= viewDistance) {//  Both
             int minx;
             int maxx;
             int minz;
             int maxz;
-            if (chX >= 0) {
-                minx = -v;
+            if (playerChunkX >= 0) {
+                minx = -viewDistance;
                 maxx = dx;
             } else {
                 minx = -dx;
-                maxx = v;
+                maxx = viewDistance;
             }
 
             if (chZ >= 0) {
-                minz = -v;
-                maxz = dz;
+                minz = -viewDistance;
+                maxz = distanceToWallZ;
             } else {
-                minz = -dz;
-                maxz = v;
+                minz = -distanceToWallZ;
+                maxz = viewDistance;
             }
 
             for (int h = -5; h < 3; h++) {
                 for (int x = minx; x < maxx; x++) {
-                    sender.sendPacketNorthSouth(p, chX + x, (pY/16) + h, (int) Math.signum(chZ)*rch, Material.WHITE_STAINED_GLASS);
+                    sender.writeChunkCoordinatesIntoPacket(p, templatePacketZAxis, playerChunkX + x, (pY/16) + h, (int) Math.signum(chZ)*rch);
                 }
                 for (int z = minz ; z < maxz; z++) {
-                    sender.sendPacketWestEast(p, (int) Math.signum(chX)*rch , (pY/16) + h, chZ + z, Material.WHITE_STAINED_GLASS);
+                    sender.writeChunkCoordinatesIntoPacket(p, templatePacketXAxis, (int) Math.signum(playerChunkX)*rch , (pY/16) + h, chZ + z);
                 }
             }
         }
@@ -623,6 +623,7 @@ public final class RadiacjaAleJAVA extends JavaPlugin implements Listener {
                                 config.set("Radiation_Safe_Zone_Size", radius);
                                 config.set("Radiation_Safe_Zone_Height", height);
                                 saveConfig();
+                                updateLocationArrays(radius + 1);
                                 sender.sendMessage(ChatColor.GREEN + "Bezpieczna strefa ma teraz promień: " + radius);
                             } else {
                                 sender.sendMessage(ChatColor.RED + "Wystąpił błąd przy dodawaniu regionu.");
@@ -694,6 +695,8 @@ public final class RadiacjaAleJAVA extends JavaPlugin implements Listener {
         }
         return true;
     }
+
+
 
     public boolean getSafeZone(Player p, String regionName, int radius, int height) {
         BlockVector3 min = BlockVector3.at(-radius, -64, -radius);
