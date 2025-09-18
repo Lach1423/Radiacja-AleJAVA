@@ -10,6 +10,7 @@ import com.sk89q.worldguard.protection.regions.ProtectedCuboidRegion;
 import me.michal.radiacjaAleJAVA.Tasks.DamageInflicter;
 import me.michal.radiacjaAleJAVA.Tasks.CuredPlayersTracker;
 import me.michal.radiacjaAleJAVA.Tasks.PacketSender;
+import me.michal.radiacjaAleJAVA.Tasks.Renderer;
 import me.michal.radiacjaAleJAVA.Tasks.Things.Updater;
 import org.bukkit.*;
 import org.bukkit.Color;
@@ -271,7 +272,7 @@ public final class RadiacjaAleJAVA extends JavaPlugin implements Listener {
     public void moveEvent(PlayerMoveEvent e) {
         Player p = e.getPlayer();
         enterRegion(p);
-        nearRadiation(p, p.getChunk());
+        nearRadiation(p);
     }
 
     public void enterRegion(Player player) {
@@ -290,149 +291,162 @@ public final class RadiacjaAleJAVA extends JavaPlugin implements Listener {
         }
     }
 
-    public void nearRadiation(Player p, Chunk chunk) {
-        int pY = (int) p.getY();
-        int r = config.getInt("Radiation_Safe_Zone_Size") + 1;
-        int playerChunkX = chunk.getX();
-        int chZ = chunk.getZ();
+    public void nearRadiation(Player player) {
+    int radius = config.getInt("Radiation_Safe_Zone_Size") + 1;
+    int distanceXToWall = (int) (radius - player.getX());
+    int distanceZToWall = (int) (radius - player.getZ());
+    int playerViewDistance = Math.min(player.getClientViewDistance(), player.getViewDistance());
 
-        int rch = (int) Math.floor(r /16f);
-        int dx = rch - Math.abs(playerChunkX);
-        int distanceToWallZ = rch - Math.abs(chZ);
-        int viewDistance = Math.min(p.getClientViewDistance(), p.getViewDistance());
+    Renderer renderer = new Renderer(player, radius, playerViewDistance);
+
+    if (distanceXToWall < 9 || distanceZToWall < 9) {
+        renderer.renderHole();
+    } else if (distanceXToWall <= playerViewDistance*16 || distanceZToWall <= playerViewDistance*16) {
+        renderer.renderWall();
+    } //else { skip }
 
 
-        boolean isNear = false;
-
-        if (curedPlayers.containsKey(p) && (dx == 1 || dx == 0)) {//East/West
-
-            int pX = (int) (p.getX() + (1*Math.signum(playerChunkX)));
-            int bdx = Math.abs(r - pX);
-            int pZ = (int) (p.getZ() + (1*Math.signum(chZ)));
-            pY = pY + 1;
-
-            if (bdx == 5) {
-                for (int[] ringoffset: offsets1Ring) {
-                    int yof = ringoffset[1];
-                    int zof = ringoffset[2];
-                    p.sendBlockChange(new Location(p.getWorld(), Math.signum(pX)*r, pY + yof, pZ + zof), Material.WHITE_STAINED_GLASS.createBlockData());
-                }
-                p.sendBlockChange(new Location(p.getWorld(), Math.signum(pX)*r, pY, pZ), Material.AIR.createBlockData());
-                isNear = true;
-            } else if (bdx == 4) {
-                for (int[] ringoffset: offsets2Ring) {
-                    int yof = ringoffset[1];
-                    int zof = ringoffset[2];
-                    p.sendBlockChange(new Location(p.getWorld(), Math.signum(pX)*r, pY + yof, pZ + zof), Material.WHITE_STAINED_GLASS.createBlockData());
-                }
-                for (int[] offset: offsets1R) {
-                    int yof = offset[1];
-                    int zof = offset[2];
-                    Location loc = new Location(p.getWorld(), Math.signum(pX)*r, pY + yof, pZ + zof);
-                    p.sendBlockChange(loc, loc.getBlock().getType().createBlockData());
-                }
-                isNear = true;
-            } else if (bdx == 3) {
-                for (int[] ringoffset: offsets3Ring) {
-                    int yof = ringoffset[1];
-                    int zof = ringoffset[2];
-                    p.sendBlockChange(new Location(p.getWorld(), Math.signum(pX)*r, pY + yof, pZ + zof), Material.WHITE_STAINED_GLASS.createBlockData());
-                }
-                for (int[] offset : offsets2R) {
-                    int yof = offset[1];
-                    int zof = offset[2];
-                    Location loc = new Location(p.getWorld(), Math.signum(pX)*r, pY + yof, pZ + zof);
-                    p.sendBlockChange(loc, loc.getBlock().getType().createBlockData());
-                }
-                isNear = true;
-            } else if (bdx < 3 && bdx >= 0) {
-                for (int[] ringoffset: offsets4Ring) {
-                    int yof = ringoffset[1];
-                    int zof = ringoffset[2];
-                    p.sendBlockChange(new Location(p.getWorld(), Math.signum(pX)*r, pY + yof, pZ + zof), Material.WHITE_STAINED_GLASS.createBlockData());
-                }
-                for (int[] offset : offsets3R) {
-                    int yof = offset[1];
-                    int zof = offset[2];
-                    Location loc = new Location(p.getWorld(), Math.signum(pX)*r, pY + yof, pZ + zof);
-                    p.sendBlockChange(loc, loc.getBlock().getType().createBlockData());
-                }
-                isNear = true;
-            } else {
-                p.sendBlockChange(new Location(p.getWorld(), Math.signum(pX)*r, pY, pZ), Material.WHITE_STAINED_GLASS.createBlockData());
-                isNear = true;
-            }
-        }
-        if (curedPlayers.containsKey(p) && (distanceToWallZ == 1 || distanceToWallZ == 0)){//South/North
-
-            int pX = (int) (p.getX() + (1*Math.signum(playerChunkX)));
-            int pZ = (int) (p.getZ() + (1*Math.signum(chZ)));
-            int bdz = Math.abs(r - pZ);
-            pY = pY + 1;
-
-            if (bdz == 5) {
-                for (int[] ringoffset: offsets1Ring) {
-                    int xof = ringoffset[0];
-                    int yof = ringoffset[1];
-                    p.sendBlockChange(new Location(p.getWorld(), pX + xof, pY + yof, Math.signum(pZ)*r), Material.WHITE_STAINED_GLASS.createBlockData());
-                }
-                p.sendBlockChange(new Location(p.getWorld(), pX, pY, Math.signum(pZ)*r), Material.AIR.createBlockData());
-                isNear = true;
-            } else if (bdz == 4) {
-                for (int[] ringoffset: offsets2Ring) {
-                    int xof = ringoffset[0];
-                    int yof = ringoffset[1];
-                    p.sendBlockChange(new Location(p.getWorld(), pX + xof, pY + yof, Math.signum(pZ)*r), Material.WHITE_STAINED_GLASS.createBlockData());
-                }
-                for (int[] offset: offsets1R) {
-                    int xof = offset[0];
-                    int yof = offset[1];
-                    Location loc = new Location(p.getWorld(), pX + xof, pY + yof, Math.signum(pZ)*r);
-                    p.sendBlockChange(loc, loc.getBlock().getType().createBlockData());
-                }
-                isNear = true;
-            } else if (bdz == 3) {
-                for (int[] ringoffset: offsets3Ring) {
-                    int xof = ringoffset[0];
-                    int yof = ringoffset[1];
-                    p.sendBlockChange(new Location(p.getWorld(), pX + xof, pY + yof, Math.signum(pZ)*r), Material.WHITE_STAINED_GLASS.createBlockData());
-                }
-                for (int[] offset : offsets2R) {
-                    int xof = offset[0];
-                    int yof = offset[1];
-                    Location loc = new Location(p.getWorld(), pX + xof, pY + yof, Math.signum(pZ)*r);
-                    p.sendBlockChange(loc, loc.getBlock().getType().createBlockData());
-                }
-                isNear = true;
-            } else if (bdz < 3 && bdz >= 0) {
-                for (int[] ringoffset: offsets4Ring) {
-                    int xof = ringoffset[0];
-                    int yof = ringoffset[1];
-                    p.sendBlockChange(new Location(p.getWorld(), pX + xof, pY + yof, Math.signum(pZ)*r), Material.WHITE_STAINED_GLASS.createBlockData());
-                }
-                for (int[] offset : offsets3R) {
-                    int xof = offset[0];
-                    int yof = offset[1];
-                    Location loc = new Location(p.getWorld(), pX + xof, pY + yof, Math.signum(pZ)*r);
-                    p.sendBlockChange(loc, loc.getBlock().getType().createBlockData());
-                }
-                isNear = true;
-            } else {
-                p.sendBlockChange(new Location(p.getWorld(), pX, pY, Math.signum(pZ)*r), Material.WHITE_STAINED_GLASS.createBlockData());
-                isNear = true;
-            }
-        }
-
-        if (p.getChunk().equals(onlinePlayers.get(p)) || isNear) {
-            return;
-        } else {
-            onlinePlayers.put(p, p.getChunk());
-        }
-        renderRadiation(dx, distanceToWallZ, viewDistance, chunk, r, p, playerChunkX, pY, chZ, rch);
+    //        int pY = (int) p.getY();
+//        int r = config.getInt("Radiation_Safe_Zone_Size") + 1;
+//        int playerChunkX = chunk.getX();
+//        int chZ = chunk.getZ();
+//
+//        int rch = (int) Math.floor(r /16f);
+//        int dx = rch - Math.abs(playerChunkX);
+//        int distanceToWallZ = rch - Math.abs(chZ);
+//        int viewDistance = Math.min(p.getClientViewDistance(), p.getViewDistance());
+//
+//
+//        boolean isNear = false;
+//
+//        if (curedPlayers.containsKey(p) && (dx == 1 || dx == 0)) {//East/West
+//
+//            int pX = (int) (p.getX() + (1*Math.signum(playerChunkX)));
+//            int bdx = Math.abs(r - pX);
+//            int pZ = (int) (p.getZ() + (1*Math.signum(chZ)));
+//            pY = pY + 1;
+//
+//            if (bdx == 5) {
+//                for (int[] ringoffset: offsets1Ring) {
+//                    int yof = ringoffset[1];
+//                    int zof = ringoffset[2];
+//                    p.sendBlockChange(new Location(p.getWorld(), Math.signum(pX)*r, pY + yof, pZ + zof), Material.WHITE_STAINED_GLASS.createBlockData());
+//                }
+//                p.sendBlockChange(new Location(p.getWorld(), Math.signum(pX)*r, pY, pZ), Material.AIR.createBlockData());
+//                isNear = true;
+//            } else if (bdx == 4) {
+//                for (int[] ringoffset: offsets2Ring) {
+//                    int yof = ringoffset[1];
+//                    int zof = ringoffset[2];
+//                    p.sendBlockChange(new Location(p.getWorld(), Math.signum(pX)*r, pY + yof, pZ + zof), Material.WHITE_STAINED_GLASS.createBlockData());
+//                }
+//                for (int[] offset: offsets1R) {
+//                    int yof = offset[1];
+//                    int zof = offset[2];
+//                    Location loc = new Location(p.getWorld(), Math.signum(pX)*r, pY + yof, pZ + zof);
+//                    p.sendBlockChange(loc, loc.getBlock().getType().createBlockData());
+//                }
+//                isNear = true;
+//            } else if (bdx == 3) {
+//                for (int[] ringoffset: offsets3Ring) {
+//                    int yof = ringoffset[1];
+//                    int zof = ringoffset[2];
+//                    p.sendBlockChange(new Location(p.getWorld(), Math.signum(pX)*r, pY + yof, pZ + zof), Material.WHITE_STAINED_GLASS.createBlockData());
+//                }
+//                for (int[] offset : offsets2R) {
+//                    int yof = offset[1];
+//                    int zof = offset[2];
+//                    Location loc = new Location(p.getWorld(), Math.signum(pX)*r, pY + yof, pZ + zof);
+//                    p.sendBlockChange(loc, loc.getBlock().getType().createBlockData());
+//                }
+//                isNear = true;
+//            } else if (bdx < 3 && bdx >= 0) {
+//                for (int[] ringoffset: offsets4Ring) {
+//                    int yof = ringoffset[1];
+//                    int zof = ringoffset[2];
+//                    p.sendBlockChange(new Location(p.getWorld(), Math.signum(pX)*r, pY + yof, pZ + zof), Material.WHITE_STAINED_GLASS.createBlockData());
+//                }
+//                for (int[] offset : offsets3R) {
+//                    int yof = offset[1];
+//                    int zof = offset[2];
+//                    Location loc = new Location(p.getWorld(), Math.signum(pX)*r, pY + yof, pZ + zof);
+//                    p.sendBlockChange(loc, loc.getBlock().getType().createBlockData());
+//                }
+//                isNear = true;
+//            } else {
+//                p.sendBlockChange(new Location(p.getWorld(), Math.signum(pX)*r, pY, pZ), Material.WHITE_STAINED_GLASS.createBlockData());
+//                isNear = true;
+//            }
+//        }
+//        if (curedPlayers.containsKey(p) && (distanceToWallZ == 1 || distanceToWallZ == 0)){//South/North
+//
+//            int pX = (int) (p.getX() + (1*Math.signum(playerChunkX)));
+//            int pZ = (int) (p.getZ() + (1*Math.signum(chZ)));
+//            int bdz = Math.abs(r - pZ);
+//            pY = pY + 1;
+//
+//            if (bdz == 5) {
+//                for (int[] ringoffset: offsets1Ring) {
+//                    int xof = ringoffset[0];
+//                    int yof = ringoffset[1];
+//                    p.sendBlockChange(new Location(p.getWorld(), pX + xof, pY + yof, Math.signum(pZ)*r), Material.WHITE_STAINED_GLASS.createBlockData());
+//                }
+//                p.sendBlockChange(new Location(p.getWorld(), pX, pY, Math.signum(pZ)*r), Material.AIR.createBlockData());
+//                isNear = true;
+//            } else if (bdz == 4) {
+//                for (int[] ringoffset: offsets2Ring) {
+//                    int xof = ringoffset[0];
+//                    int yof = ringoffset[1];
+//                    p.sendBlockChange(new Location(p.getWorld(), pX + xof, pY + yof, Math.signum(pZ)*r), Material.WHITE_STAINED_GLASS.createBlockData());
+//                }
+//                for (int[] offset: offsets1R) {
+//                    int xof = offset[0];
+//                    int yof = offset[1];
+//                    Location loc = new Location(p.getWorld(), pX + xof, pY + yof, Math.signum(pZ)*r);
+//                    p.sendBlockChange(loc, loc.getBlock().getType().createBlockData());
+//                }
+//                isNear = true;
+//            } else if (bdz == 3) {
+//                for (int[] ringoffset: offsets3Ring) {
+//                    int xof = ringoffset[0];
+//                    int yof = ringoffset[1];
+//                    p.sendBlockChange(new Location(p.getWorld(), pX + xof, pY + yof, Math.signum(pZ)*r), Material.WHITE_STAINED_GLASS.createBlockData());
+//                }
+//                for (int[] offset : offsets2R) {
+//                    int xof = offset[0];
+//                    int yof = offset[1];
+//                    Location loc = new Location(p.getWorld(), pX + xof, pY + yof, Math.signum(pZ)*r);
+//                    p.sendBlockChange(loc, loc.getBlock().getType().createBlockData());
+//                }
+//                isNear = true;
+//            } else if (bdz < 3 && bdz >= 0) {
+//                for (int[] ringoffset: offsets4Ring) {
+//                    int xof = ringoffset[0];
+//                    int yof = ringoffset[1];
+//                    p.sendBlockChange(new Location(p.getWorld(), pX + xof, pY + yof, Math.signum(pZ)*r), Material.WHITE_STAINED_GLASS.createBlockData());
+//                }
+//                for (int[] offset : offsets3R) {
+//                    int xof = offset[0];
+//                    int yof = offset[1];
+//                    Location loc = new Location(p.getWorld(), pX + xof, pY + yof, Math.signum(pZ)*r);
+//                    p.sendBlockChange(loc, loc.getBlock().getType().createBlockData());
+//                }
+//                isNear = true;
+//            } else {
+//                p.sendBlockChange(new Location(p.getWorld(), pX, pY, Math.signum(pZ)*r), Material.WHITE_STAINED_GLASS.createBlockData());
+//                isNear = true;
+//            }
+//        }
+//
+//        if (p.getChunk().equals(onlinePlayers.get(p)) || isNear) {
+//            return;
+//        } else {
+//            onlinePlayers.put(p, p.getChunk());
+//        }
+//        renderRadiation(dx, distanceToWallZ, viewDistance, chunk, r, p, playerChunkX, pY, chZ, rch);
     }
-
     public void renderRadiation(int dx, int distanceToWallZ, int viewDistance, Chunk chunk, int r, Player p, int playerChunkX, int pY, int chZ, int rch) {
-        PacketSender sender = new PacketSender(chunk, config, r);
+        PacketSender sender = new PacketSender();
         if (distanceToWallZ <= viewDistance && dx > viewDistance) {//  South/North
             for (int h = -5; h < 3; h++) {
                 for (int x = distanceToWallZ - viewDistance*3/2; x < -(distanceToWallZ - viewDistance*3/2) + 1; x++) {
@@ -486,7 +500,7 @@ public final class RadiacjaAleJAVA extends JavaPlugin implements Listener {
     public void joinEvent(PlayerJoinEvent e) {
         Player p = e.getPlayer();
         onlinePlayers.put(p, p.getChunk());
-        nearRadiation(p, p.getChunk());
+        nearRadiation(p);
         UUID uuid = p.getUniqueId();
 
         if (offlinePlayers.containsKey(uuid)) {
@@ -695,8 +709,6 @@ public final class RadiacjaAleJAVA extends JavaPlugin implements Listener {
         }
         return true;
     }
-
-
 
     public boolean getSafeZone(Player p, String regionName, int radius, int height) {
         BlockVector3 min = BlockVector3.at(-radius, -64, -radius);

@@ -6,19 +6,13 @@ import com.comphenix.protocol.events.PacketContainer;
 import com.comphenix.protocol.wrappers.BlockPosition;
 import com.comphenix.protocol.wrappers.WrappedBlockData;
 import org.apache.commons.lang3.ArrayUtils;
-import org.bukkit.Chunk;
 import org.bukkit.Material;
-import org.bukkit.configuration.file.FileConfiguration;
 import org.bukkit.entity.Player;
 
 import java.lang.reflect.InvocationTargetException;
 import java.util.ArrayList;
 
 public class PacketSender {
-    Chunk chunk;
-    FileConfiguration config;
-    int r;
-    double h;
     private static final ArrayList<WrappedBlockData> materialArray = new ArrayList<>();
     static {
         Material material = Material.WHITE_STAINED_GLASS; // or whatever
@@ -65,11 +59,7 @@ public class PacketSender {
         return (short) (x << 8 | z << 4 | y);
     }
 
-    public PacketSender(Chunk chunk, FileConfiguration config, int r) {
-        this.chunk = chunk;
-        this.config = config;
-        this.r = r;
-        this.h = config.getDouble("Radiation_Safe_Zone_Height");
+    public PacketSender() {
     }
 
     /*public void sendPacketNorthSouth(Player p, int x, int y, int z) {
@@ -87,13 +77,13 @@ public class PacketSender {
         sendPackage(p, writeDataToPacket(locationArray, packet));
     }*/
 
-    public void writeChunkCoordinatesIntoPacket(Player p, PacketContainer packetContainer, int x, int y, int z) {
+    public PacketContainer writeChunkCoordinatesIntoPacket(Player p, PacketContainer packetContainer, int x, int y, int z) {
         PacketContainer packet  = packetContainer.deepClone();
         packet.getSectionPositions().write(0, new BlockPosition(x, y, z));//Chunk coordinates
-        sendPackage(p, packet);
+        return packet;
     }
 
-    private void sendPackage(Player p, PacketContainer packet) {
+    public void sendPackage(Player p, PacketContainer packet) {
         try {
             ProtocolLibrary.getProtocolManager().sendServerPacket(p, packet);
         } catch (InvocationTargetException e) {
