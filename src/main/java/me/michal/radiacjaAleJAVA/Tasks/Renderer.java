@@ -3,6 +3,8 @@ package me.michal.radiacjaAleJAVA.Tasks;
 import com.comphenix.protocol.events.PacketContainer;
 import org.bukkit.entity.Player;
 
+import java.util.Arrays;
+
 public class Renderer {
     Player player;
     int radius;
@@ -17,15 +19,16 @@ public class Renderer {
         this.player = player;
         this.radius = radius;
         this.playerX = (int) player.getX();
-        this.playerY = (int) player.getY();
+        this.playerY = Math.floorDiv((int) player.getY(), 16);
         this.playerZ = (int) player.getZ();
         this.radiusChunk = Math.floorDiv(radius, 16);
-        this.playerViewDistance = playerViewDistance;
+        this.playerViewDistance = playerViewDistance * 16;
         this.packetSender = new PacketSender();
     }
 
     public void renderWall() {
         int[] coordinates = calculateCoordinates();
+        player.sendMessage("Coordinates: " + Arrays.toString(coordinates));
         int chunkX;
         int chunkY;
         int chunkZ;
@@ -33,27 +36,30 @@ public class Renderer {
         for (int h = playerY - 2; h <= playerY + 2; h++) {
             chunkY = h;
             chunkZ = (int) (radiusChunk * Math.signum(playerZ));
-            for (int i = Math.floorDiv(coordinates[0], 16); i <= Math.floorDiv(coordinates[1], 16); i++) {
+            for (int i = coordinates[0]; i <= coordinates[1]; i++) {
                 chunkX = i;
-                PacketContainer packet = packetSender.writeChunkCoordinatesIntoPacket(player, PacketSender.templatePacketZAxis, chunkX, chunkY, chunkZ);
+                PacketContainer packet = packetSender.writeChunkCoordinatesIntoPacket(true/*PacketSender.packetTemplateZAxis*/, chunkX, chunkY, chunkZ);
                 packetSender.sendPackage(player, packet);
             }
             chunkX = (int) (radiusChunk * Math.signum(playerX));
-            for (int i = Math.floorDiv(coordinates[2], 16); i <= Math.floorDiv(coordinates[3], 16); i++) {
+            for (int i = coordinates[2]; i <= coordinates[3]; i++) {
                 chunkZ = i;
-                PacketContainer packet = packetSender.writeChunkCoordinatesIntoPacket(player, PacketSender.templatePacketXAxis, chunkX, chunkY, chunkZ);
+                PacketContainer packet = packetSender.writeChunkCoordinatesIntoPacket(false/*PacketSender.packetTemplateXAxis*/, chunkX, chunkY, chunkZ);
                 packetSender.sendPackage(player, packet);
             }
+            //render Corners
         }
+        PacketContainer packet = packetSender.writeChunkCoordinatesIntoPacket(false/*PacketSender.packetTemplateZAxis*/, 95, 5, -93);
+        packetSender.sendPackage(player, packet);
     }
 
     public int[] calculateCoordinates() {
         int[] result = new int[4];
 
-        result[0] = Math.max(-radius, playerX - playerViewDistance); //min
-        result[1] = Math.min(radius, playerX + playerViewDistance); //max
-        result[2] = Math.max(-radius, playerZ - playerViewDistance); //min
-        result[3] = Math.min(radius, playerZ + playerViewDistance); //max
+        result[0] = Math.floorDiv(Math.max(-radius, playerX - playerViewDistance), 16); //min
+        result[1] = Math.floorDiv(Math.min(radius, playerX + playerViewDistance), 16); //max
+        result[2] = Math.floorDiv(Math.max(-radius, playerZ - playerViewDistance), 16); //min
+        result[3] = Math.floorDiv(Math.min(radius, playerZ + playerViewDistance), 16); //max
 
         return result;
     }

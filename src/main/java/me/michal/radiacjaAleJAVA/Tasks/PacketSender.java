@@ -20,36 +20,47 @@ public class PacketSender {
             materialArray.add(WrappedBlockData.createData(material));
         }
     }
-    public static final PacketContainer templatePacketXAxis  = new PacketContainer(PacketType.Play.Server.MULTI_BLOCK_CHANGE);
-    public static final PacketContainer templatePacketZAxis  = new PacketContainer(PacketType.Play.Server.MULTI_BLOCK_CHANGE);
+    public static final PacketContainer packetTemplateXAxis = new PacketContainer(PacketType.Play.Server.MULTI_BLOCK_CHANGE);
+    public static final PacketContainer packetTemplateZAxis = new PacketContainer(PacketType.Play.Server.MULTI_BLOCK_CHANGE);
+    public static final PacketContainer packetTemplateCorner  = new PacketContainer(PacketType.Play.Server.MULTI_BLOCK_CHANGE);
 
-    public static void updateLocationArrays(int r) {
+    public static void updateLocationArrays(int radius) {
         ArrayList<Short> locationArrayXAxis = new ArrayList<>();
         ArrayList<Short> locationArrayZAxis = new ArrayList<>();
+        //ArrayList<Short> locationArrayCorner = new ArrayList<>();
+        int radiusBlockInChunk = radius % 16;
+
         for (int he = 0; he < 16; he++) {
+            /*for (int i = 0; i < radiusBlockInChunk; i++) {
+                locationArrayCorner.add(setShortLocation(radius, he, i));
+                locationArrayCorner.add(setShortLocation(i, he, radius));
+            }*/
             for (int i = 0; i < 16; i++) {
-                locationArrayXAxis.add(setShortLocation(r, he, i));//cords within a chunk
-                locationArrayZAxis.add(setShortLocation(i, he, r));
+                locationArrayXAxis.add(setShortLocation(i, he, radius));//cords within a chunk
+                locationArrayZAxis.add(setShortLocation(radius, he, i));
             }
+            //locationArrayCorner.removeLast();
         }
-        writeDataToPacket(locationArrayXAxis, templatePacketXAxis);
-        writeDataToPacket(locationArrayZAxis, templatePacketZAxis);
+
+        writeArraysToPacket(locationArrayXAxis, true/*packetTemplateXAxis*/);
+        writeArraysToPacket(locationArrayZAxis, false/*packetTemplateZAxis*/);
+        //writeDataToPacket(locationArrayCorner, packetTemplateCorner);
     }
 
-    public static void writeDataToPacket(ArrayList<Short> locationArray, PacketContainer packet) {
+    public static void writeArraysToPacket(ArrayList<Short> locationArray, boolean shouldUpdateXTemplate/*PacketContainer packet*/) {
         WrappedBlockData[] blockData = materialArray.toArray(new WrappedBlockData[0]);
         short[] blockLocations = ArrayUtils.toPrimitive(locationArray.toArray(new Short[0]));
 
-        packet.getBlockDataArrays().writeSafely(0, blockData);
-        packet.getShortArrays().writeSafely(0, blockLocations);
+        /*packet.getBlockDataArrays().writeSafely(0, blockData);
+        packet.getShortArrays().writeSafely(0, blockLocations);*/
 
-        /*if (shouldUpdateXTemplate) {
-            templatePacketXAxis.getBlockDataArrays().writeSafely(0, blockData);
-            templatePacketXAxis.getShortArrays().writeSafely(0, blockLocations);
+        if (shouldUpdateXTemplate) {
+            packetTemplateXAxis.getBlockDataArrays().writeSafely(0, blockData);
+            packetTemplateXAxis.getShortArrays().writeSafely(0, blockLocations);
         } else {
-            templatePacketZAxis.getBlockDataArrays().writeSafely(0, blockData);
-            templatePacketZAxis.getShortArrays().writeSafely(0, blockLocations);
-        }*/ //If upper version won't work
+            packetTemplateZAxis.getBlockDataArrays().writeSafely(0, blockData);
+            packetTemplateZAxis.getShortArrays().writeSafely(0, blockLocations);
+        } //If upper version won't work
     }
 
     private static short setShortLocation(int x, int y, int z) {
@@ -62,23 +73,13 @@ public class PacketSender {
     public PacketSender() {
     }
 
-    /*public void sendPacketNorthSouth(Player p, int x, int y, int z) {
-        PacketContainer packet  = new PacketContainer(PacketType.Play.Server.MULTI_BLOCK_CHANGE);
-        ArrayList<Short> locationArray = new ArrayList<>();
-
-        packet.getSectionPositions().write(0, new BlockPosition(x, y, z));//Chunk coordinates
-
-        for (int he = 0; he < 16; he++) {
-            for (int i = 0; i < 16; i++) {
-                locationArray.add(setShortLocation(i, he, r));//cords within a chunk
-            }
+    public PacketContainer writeChunkCoordinatesIntoPacket(boolean shouldUseXAxis/*PacketContainer packetContainer*/, int x, int y, int z) {
+        PacketContainer packet; /*= packetContainer.deepClone();*/
+        if (shouldUseXAxis) {
+            packet = packetTemplateXAxis.deepClone();
+        } else {
+            packet = packetTemplateZAxis.deepClone();
         }
-
-        sendPackage(p, writeDataToPacket(locationArray, packet));
-    }*/
-
-    public PacketContainer writeChunkCoordinatesIntoPacket(Player p, PacketContainer packetContainer, int x, int y, int z) {
-        PacketContainer packet  = packetContainer.deepClone();
         packet.getSectionPositions().write(0, new BlockPosition(x, y, z));//Chunk coordinates
         return packet;
     }

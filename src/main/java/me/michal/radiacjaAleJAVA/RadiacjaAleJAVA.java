@@ -30,6 +30,8 @@ import org.bukkit.inventory.*;
 import org.bukkit.inventory.meta.ItemMeta;
 import org.bukkit.inventory.meta.PotionMeta;
 import org.bukkit.inventory.meta.SkullMeta;
+import org.bukkit.metadata.FixedMetadataValue;
+import org.bukkit.metadata.MetadataValue;
 import org.bukkit.persistence.PersistentDataType;
 import org.bukkit.plugin.java.JavaPlugin;
 import org.bukkit.entity.Player;
@@ -292,18 +294,27 @@ public final class RadiacjaAleJAVA extends JavaPlugin implements Listener {
     }
 
     public void nearRadiation(Player player) {
-    int radius = config.getInt("Radiation_Safe_Zone_Size") + 1;
-    int distanceXToWall = (int) (radius - player.getX());
-    int distanceZToWall = (int) (radius - player.getZ());
-    int playerViewDistance = Math.min(player.getClientViewDistance(), player.getViewDistance());
+        Chunk playerChunk = player.getChunk();
+        if (onlinePlayers.get(player).equals(playerChunk)) {
+            return;
+        } else {
+            onlinePlayers.put(player, playerChunk);
+        } //optimisation I think
 
-    Renderer renderer = new Renderer(player, radius, playerViewDistance);
+        int radius = config.getInt("Radiation_Safe_Zone_Size") + 1;
+        int distanceXToWall = (int) (radius - Math.abs(player.getX()));
+        int distanceZToWall = (int) (radius - Math.abs(player.getZ()));
+        int playerViewDistance = Math.min(player.getClientViewDistance(), player.getViewDistance());
+        //player.sendMessage("pVD, dXTW, dZTW: " + playerViewDistance + " " + distanceXToWall + " " + distanceZToWall);
 
-    if (distanceXToWall < 9 || distanceZToWall < 9) {
-        renderer.renderHole();
-    } else if (distanceXToWall <= playerViewDistance*16 || distanceZToWall <= playerViewDistance*16) {
-        renderer.renderWall();
-    } //else { skip }
+        Renderer renderer = new Renderer(player, radius, playerViewDistance);
+
+        if (curedPlayers.containsKey(player) && distanceXToWall < 9 || distanceZToWall < 9) {
+            player.sendMessage("renderuje hole");
+            renderer.renderHole();
+        } else if (distanceXToWall <= playerViewDistance*16 || distanceZToWall <= playerViewDistance*16) {
+            renderer.renderWall();
+        } //else { skip }
 
 
     //        int pY = (int) p.getY();
@@ -438,19 +449,19 @@ public final class RadiacjaAleJAVA extends JavaPlugin implements Listener {
 //            }
 //        }
 //
-//        if (p.getChunk().equals(onlinePlayers.get(p)) || isNear) {
+//       if (p.getChunk().equals(onlinePlayers.get(p)) || isNear) {
 //            return;
 //        } else {
 //            onlinePlayers.put(p, p.getChunk());
 //        }
 //        renderRadiation(dx, distanceToWallZ, viewDistance, chunk, r, p, playerChunkX, pY, chZ, rch);
     }
-    public void renderRadiation(int dx, int distanceToWallZ, int viewDistance, Chunk chunk, int r, Player p, int playerChunkX, int pY, int chZ, int rch) {
+    /*public void renderRadiation(int dx, int distanceToWallZ, int viewDistance, Chunk chunk, int r, Player p, int playerChunkX, int pY, int chZ, int rch) {
         PacketSender sender = new PacketSender();
         if (distanceToWallZ <= viewDistance && dx > viewDistance) {//  South/North
             for (int h = -5; h < 3; h++) {
                 for (int x = distanceToWallZ - viewDistance*3/2; x < -(distanceToWallZ - viewDistance*3/2) + 1; x++) {
-                    sender.writeChunkCoordinatesIntoPacket(p, templatePacketZAxis ,playerChunkX + x, (pY/16) + h, (int) Math.signum(chZ)*rch);
+                    sender.writeChunkCoordinatesIntoPacket(packetTemplateZAxis,playerChunkX + x, (pY/16) + h, (int) Math.signum(chZ)*rch);
                 }
             }
         } else if (dx <= viewDistance && distanceToWallZ > viewDistance) {//   West/East
@@ -461,7 +472,7 @@ public final class RadiacjaAleJAVA extends JavaPlugin implements Listener {
                     int packetY = (pY/16) + h;
                     int packetZ = chZ + z;
                     //p.sendMessage("x: " + z + "    tx: " + tx + "   ty: " + ty + "   tz: " + tz);
-                    sender.writeChunkCoordinatesIntoPacket(p, templatePacketZAxis, packetX ,packetY, packetZ);
+                    sender.writeChunkCoordinatesIntoPacket(packetTemplateZAxis, packetX ,packetY, packetZ);
                 }
             }
         } else if (dx <= viewDistance && distanceToWallZ <= viewDistance) {//  Both
@@ -487,22 +498,22 @@ public final class RadiacjaAleJAVA extends JavaPlugin implements Listener {
 
             for (int h = -5; h < 3; h++) {
                 for (int x = minx; x < maxx; x++) {
-                    sender.writeChunkCoordinatesIntoPacket(p, templatePacketZAxis, playerChunkX + x, (pY/16) + h, (int) Math.signum(chZ)*rch);
+                    sender.writeChunkCoordinatesIntoPacket(packetTemplateZAxis, playerChunkX + x, (pY/16) + h, (int) Math.signum(chZ)*rch);
                 }
                 for (int z = minz ; z < maxz; z++) {
-                    sender.writeChunkCoordinatesIntoPacket(p, templatePacketXAxis, (int) Math.signum(playerChunkX)*rch , (pY/16) + h, chZ + z);
+                    sender.writeChunkCoordinatesIntoPacket(packetTemplateXAxis, (int) Math.signum(playerChunkX)*rch , (pY/16) + h, chZ + z);
                 }
             }
         }
-    }
+    }*/
 
     @EventHandler
     public void joinEvent(PlayerJoinEvent e) {
         Player p = e.getPlayer();
         onlinePlayers.put(p, p.getChunk());
         nearRadiation(p);
-        UUID uuid = p.getUniqueId();
 
+        UUID uuid = p.getUniqueId();
         if (offlinePlayers.containsKey(uuid)) {
             long startTime = System.currentTimeMillis() - offlinePlayers.get(uuid);
 
