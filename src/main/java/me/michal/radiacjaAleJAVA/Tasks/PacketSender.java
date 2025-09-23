@@ -47,6 +47,16 @@ public class PacketSender {
         //writeDataToPacket(locationArrayCorner, packetTemplateCorner);
     }
 
+    public static ArrayList<Short> getArrayLocationCorner (ArrayList<Short> array, int radius, int[] point) {
+    for (int i = 0; i <= coords[0]; i++){
+        array.add(i, radius);
+    }
+    for (int i = 0; i <= coords[1]; i++){   
+        array.add(radius, i);
+    }
+    return array;
+}
+
     public static void writeArraysToPacket(ArrayList<Short> locationArray, boolean shouldUpdateXTemplate/*PacketContainer packet*/) {
         WrappedBlockData[] blockData = materialArray.toArray(new WrappedBlockData[0]);
         short[] blockLocations = ArrayUtils.toPrimitive(locationArray.toArray(new Short[0]));
