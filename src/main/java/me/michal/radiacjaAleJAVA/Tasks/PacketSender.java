@@ -72,10 +72,6 @@ public class PacketSender {
         points.put(Corner.NORTH_WEST, new int[]{radiusOffsetInChunk, radiusOffsetInChunk - 1});
 
         fillCornerArray(radius);
-
-        /*cornerLocations[1] = fillCornerArray(new ArrayList<>(), radius, new int[2]);
-        cornerLocations[2] = fillCornerArray(new ArrayList<>(), radius, new int[2]);
-        cornerLocations[3] = fillCornerArray(new ArrayList<>(), radius, new int[2]);*/
         writeArraysToPackets(locationArrayXAxis, locationArrayZAxis);
     }
 
