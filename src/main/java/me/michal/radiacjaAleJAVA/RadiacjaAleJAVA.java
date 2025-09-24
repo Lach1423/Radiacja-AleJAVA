@@ -166,6 +166,8 @@ public final class RadiacjaAleJAVA extends JavaPlugin implements Listener {
         config.addDefault("Radiation_Name", "Strefa radiacji");
         config.options().copyDefaults(true);
         saveConfig();
+
+        updateLocationArrays(config.getInt("Radiation_Safe_Zone_Size"));
     }
 
     @EventHandler
@@ -305,7 +307,6 @@ public final class RadiacjaAleJAVA extends JavaPlugin implements Listener {
         int distanceXToWall = (int) (radius - Math.abs(player.getX()));
         int distanceZToWall = (int) (radius - Math.abs(player.getZ()));
         int playerViewDistance = Math.min(player.getClientViewDistance(), player.getViewDistance());
-        //player.sendMessage("pVD, dXTW, dZTW: " + playerViewDistance + " " + distanceXToWall + " " + distanceZToWall);
 
         Renderer renderer = new Renderer(player, radius, playerViewDistance);
 
@@ -716,7 +717,7 @@ public final class RadiacjaAleJAVA extends JavaPlugin implements Listener {
                 }
             }
         } else {
-                sender.sendMessage(ChatColor.RED + ("Nie masz uprawnień do tej komendy " + ChatColor.DARK_RED + "knypku"));
+            sender.sendMessage(ChatColor.RED + ("Nie masz uprawnień do tej komendy " + ChatColor.DARK_RED + "knypku"));
         }
         return true;
     }

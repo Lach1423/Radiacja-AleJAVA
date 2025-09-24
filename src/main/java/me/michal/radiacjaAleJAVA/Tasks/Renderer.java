@@ -3,8 +3,6 @@ package me.michal.radiacjaAleJAVA.Tasks;
 import com.comphenix.protocol.events.PacketContainer;
 import org.bukkit.entity.Player;
 
-import java.util.Arrays;
-
 public class Renderer {
     Player player;
     int radius;
@@ -28,7 +26,6 @@ public class Renderer {
 
     public void renderWall() {
         int[] coordinates = calculateCoordinates();
-        player.sendMessage("Coordinates: " + Arrays.toString(coordinates));
         int chunkX;
         int chunkY;
         int chunkZ;
@@ -38,19 +35,18 @@ public class Renderer {
             chunkZ = (int) (radiusChunk * Math.signum(playerZ));
             for (int i = coordinates[0]; i <= coordinates[1]; i++) {
                 chunkX = i;
-                PacketContainer packet = packetSender.writeChunkCoordinatesIntoPacket(true/*PacketSender.packetTemplateZAxis*/, chunkX, chunkY, chunkZ);
+                PacketContainer packet = packetSender.writeChunkCoordinatesIntoPacket(PacketSender.AxisTemplate.X_AXIS, chunkX, chunkY, chunkZ);
                 packetSender.sendPackage(player, packet);
             }
+
             chunkX = (int) (radiusChunk * Math.signum(playerX));
             for (int i = coordinates[2]; i <= coordinates[3]; i++) {
                 chunkZ = i;
-                PacketContainer packet = packetSender.writeChunkCoordinatesIntoPacket(false/*PacketSender.packetTemplateXAxis*/, chunkX, chunkY, chunkZ);
+                PacketContainer packet = packetSender.writeChunkCoordinatesIntoPacket(PacketSender.AxisTemplate.Z_AXIS, chunkX, chunkY, chunkZ);
                 packetSender.sendPackage(player, packet);
             }
             //render Corners
         }
-        PacketContainer packet = packetSender.writeChunkCoordinatesIntoPacket(false/*PacketSender.packetTemplateZAxis*/, 95, 5, -93);
-        packetSender.sendPackage(player, packet);
     }
 
     public int[] calculateCoordinates() {

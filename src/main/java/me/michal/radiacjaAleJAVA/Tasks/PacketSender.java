@@ -11,6 +11,10 @@ import org.bukkit.entity.Player;
 
 import java.lang.reflect.InvocationTargetException;
 import java.util.ArrayList;
+import java.util.EnumMap;
+import java.util.List;
+import java.util.Map;
+import java.util.logging.Logger;
 
 public class PacketSender {
     private static final ArrayList<WrappedBlockData> materialArray = new ArrayList<>();
@@ -22,55 +26,98 @@ public class PacketSender {
     }
     public static final PacketContainer packetTemplateXAxis = new PacketContainer(PacketType.Play.Server.MULTI_BLOCK_CHANGE);
     public static final PacketContainer packetTemplateZAxis = new PacketContainer(PacketType.Play.Server.MULTI_BLOCK_CHANGE);
-    public static final PacketContainer packetTemplateCorner  = new PacketContainer(PacketType.Play.Server.MULTI_BLOCK_CHANGE);
+
+    enum Corner { NORTH_EAST, NORTH_WEST, SOUTH_EAST, SOUTH_WEST }
+    public static Map<Corner, List<Short>> cornerLocations = new EnumMap<>(Corner.class);
+    static {
+        for (Corner c : Corner.values()) {
+            cornerLocations.put(c, new ArrayList<>());
+        }
+    }
+    public static Map<Corner, PacketContainer> cornerTemplates = new EnumMap<>(Corner.class);
+    static {
+        for (Corner c : Corner.values()) {
+            cornerTemplates.put(c, new PacketContainer(PacketType.Play.Server.MULTI_BLOCK_CHANGE));
+        }
+    }
+    private static final Map<Corner, int[]> points = new EnumMap<>(Corner.class);
+    static {
+        for (Corner c : Corner.values()) {
+            points.put(c, new int[2]); // not cornerTemplates
+        }
+    }
+
+    public enum AxisTemplate {
+        X_AXIS,
+        Z_AXIS,
+        C_AXIS //Corner Axis
+    }
+    private final Logger log;
 
     public static void updateLocationArrays(int radius) {
         ArrayList<Short> locationArrayXAxis = new ArrayList<>();
         ArrayList<Short> locationArrayZAxis = new ArrayList<>();
-        //ArrayList<Short> locationArrayCorner = new ArrayList<>();
-        int radiusBlockInChunk = radius % 16;
 
         for (int he = 0; he < 16; he++) {
-            /*for (int i = 0; i < radiusBlockInChunk; i++) {
-                locationArrayCorner.add(setShortLocation(radius, he, i));
-                locationArrayCorner.add(setShortLocation(i, he, radius));
-            }*/
             for (int i = 0; i < 16; i++) {
                 locationArrayXAxis.add(setShortLocation(i, he, radius));//cords within a chunk
                 locationArrayZAxis.add(setShortLocation(radius, he, i));
             }
-            //locationArrayCorner.removeLast();
         }
+        int radiusOffsetInChunk = radius % 16;
+        points.clear();
+        points.put(Corner.SOUTH_EAST, new int[]{radiusOffsetInChunk, radiusOffsetInChunk});
+        points.put(Corner.SOUTH_WEST, new int[]{radiusOffsetInChunk - 1, radiusOffsetInChunk});
+        points.put(Corner.NORTH_EAST, new int[]{radiusOffsetInChunk - 1, radiusOffsetInChunk - 1});
+        points.put(Corner.NORTH_WEST, new int[]{radiusOffsetInChunk, radiusOffsetInChunk - 1});
 
-        writeArraysToPacket(locationArrayXAxis, true/*packetTemplateXAxis*/);
-        writeArraysToPacket(locationArrayZAxis, false/*packetTemplateZAxis*/);
-        //writeDataToPacket(locationArrayCorner, packetTemplateCorner);
+        fillCornerArray(radius);
+
+        /*cornerLocations[1] = fillCornerArray(new ArrayList<>(), radius, new int[2]);
+        cornerLocations[2] = fillCornerArray(new ArrayList<>(), radius, new int[2]);
+        cornerLocations[3] = fillCornerArray(new ArrayList<>(), radius, new int[2]);*/
+        writeArraysToPackets(locationArrayXAxis, locationArrayZAxis);
     }
 
-    public static ArrayList<Short> getArrayLocationCorner (ArrayList<Short> array, int radius, int[] point) {
-    for (int i = 0; i <= coords[0]; i++){
-        array.add(i, radius);
+    public static void fillCornerArray(int radius) {
+        for (Corner c : Corner.values()) {
+            cornerLocations.get(c).clear();
+            for (int h = 0; h < 16; h++) {
+                for (int i = 0; i <= points.get(c)[0]; i++) {
+                    cornerLocations.get(c).add(setShortLocation(i, h, radius));
+                }
+                for (int i = 0; i < points.get(c)[1]; i++) {
+                    cornerLocations.get(c).add(setShortLocation(i, h, radius));
+                }
+            }
+        }
     }
-    for (int i = 0; i <= coords[1]; i++){   
-        array.add(radius, i);
-    }
-    return array;
-}
 
-    public static void writeArraysToPacket(ArrayList<Short> locationArray, boolean shouldUpdateXTemplate/*PacketContainer packet*/) {
+
+    public static void writeArraysToPackets(ArrayList<Short> xAxisLocations, ArrayList<Short> zAxisLocations) {
         WrappedBlockData[] blockData = materialArray.toArray(new WrappedBlockData[0]);
-        short[] blockLocations = ArrayUtils.toPrimitive(locationArray.toArray(new Short[0]));
 
-        /*packet.getBlockDataArrays().writeSafely(0, blockData);
-        packet.getShortArrays().writeSafely(0, blockLocations);*/
+        short[] blockLocations = ArrayUtils.toPrimitive(xAxisLocations.toArray(new Short[0]));
+        packetTemplateXAxis.getBlockDataArrays().writeSafely(0, blockData);
+        packetTemplateXAxis.getShortArrays().writeSafely(0, blockLocations);
 
-        if (shouldUpdateXTemplate) {
-            packetTemplateXAxis.getBlockDataArrays().writeSafely(0, blockData);
-            packetTemplateXAxis.getShortArrays().writeSafely(0, blockLocations);
-        } else {
-            packetTemplateZAxis.getBlockDataArrays().writeSafely(0, blockData);
-            packetTemplateZAxis.getShortArrays().writeSafely(0, blockLocations);
-        } //If upper version won't work
+        blockLocations = ArrayUtils.toPrimitive(zAxisLocations.toArray(new Short[0]));
+        packetTemplateZAxis.getBlockDataArrays().writeSafely(0, blockData);
+        packetTemplateZAxis.getShortArrays().writeSafely(0, blockLocations);
+
+        for (Corner c : Corner.values()) {
+            blockData = getMaterialArray(cornerLocations.get(c).size(), new ArrayList<>());
+            blockLocations = ArrayUtils.toPrimitive(cornerLocations.get(c).toArray(new Short[0]));
+            cornerTemplates.get(c).getBlockDataArrays().writeSafely(0, blockData);
+            cornerTemplates.get(c).getShortArrays().writeSafely(0, blockLocations);
+        }
+    }
+
+    private static WrappedBlockData[] getMaterialArray(int size, ArrayList<WrappedBlockData> array) {
+        for (int i = 0; i < size; i++) {
+            array.add(WrappedBlockData.createData(Material.WHITE_STAINED_GLASS));
+        }
+        return array.toArray(new WrappedBlockData[0]);
     }
 
     private static short setShortLocation(int x, int y, int z) {
@@ -81,15 +128,17 @@ public class PacketSender {
     }
 
     public PacketSender() {
+        log = Logger.getLogger("miguel");
     }
 
-    public PacketContainer writeChunkCoordinatesIntoPacket(boolean shouldUseXAxis/*PacketContainer packetContainer*/, int x, int y, int z) {
-        PacketContainer packet; /*= packetContainer.deepClone();*/
-        if (shouldUseXAxis) {
-            packet = packetTemplateXAxis.deepClone();
-        } else {
-            packet = packetTemplateZAxis.deepClone();
+    public PacketContainer writeChunkCoordinatesIntoPacket(AxisTemplate axis, int x, int y, int z) {
+        PacketContainer packet;
+        switch (axis) {
+            case X_AXIS -> packet = packetTemplateXAxis.deepClone();
+            case Z_AXIS -> packet = packetTemplateZAxis.deepClone();
+            default -> throw new IllegalArgumentException("Unknown axis: " + axis);
         }
+
         packet.getSectionPositions().write(0, new BlockPosition(x, y, z));//Chunk coordinates
         return packet;
     }
@@ -98,7 +147,7 @@ public class PacketSender {
         try {
             ProtocolLibrary.getProtocolManager().sendServerPacket(p, packet);
         } catch (InvocationTargetException e) {
-            e.printStackTrace();
+            log.warning("Failed to send packet to " + p);
         }
     }
 }
