@@ -27,7 +27,7 @@ public class PacketSender {
     public static final PacketContainer packetTemplateXAxis = new PacketContainer(PacketType.Play.Server.MULTI_BLOCK_CHANGE);
     public static final PacketContainer packetTemplateZAxis = new PacketContainer(PacketType.Play.Server.MULTI_BLOCK_CHANGE);
 
-    enum Corner { NORTH_EAST, NORTH_WEST, SOUTH_EAST, SOUTH_WEST }
+    public enum Corner { NORTH_EAST, NORTH_WEST, SOUTH_EAST, SOUTH_WEST }
     public static Map<Corner, List<Short>> cornerLocations = new EnumMap<>(Corner.class);
     static {
         for (Corner c : Corner.values()) {
@@ -53,6 +53,10 @@ public class PacketSender {
         C_AXIS //Corner Axis
     }
     private final Logger log;
+
+    public PacketSender() {
+        log = Logger.getLogger("miguel");
+    }
 
     public static void updateLocationArrays(int radius) {
         ArrayList<Short> locationArrayXAxis = new ArrayList<>();
@@ -89,7 +93,6 @@ public class PacketSender {
         }
     }
 
-
     public static void writeArraysToPackets(ArrayList<Short> xAxisLocations, ArrayList<Short> zAxisLocations) {
         WrappedBlockData[] blockData = materialArray.toArray(new WrappedBlockData[0]);
 
@@ -123,8 +126,30 @@ public class PacketSender {
         return (short) (x << 8 | z << 4 | y);
     }
 
-    public PacketSender() {
-        log = Logger.getLogger("miguel");
+    public PacketContainer writeCoordinatesToCorners(int radius, Corner corner, int h) {
+        int[] coords = new int[2];
+        PacketContainer packet;
+        switch (corner) {
+            case Corner.SOUTH_EAST -> {
+                coords[0] = radius;
+                coords[1] = radius;
+            }
+            case Corner.SOUTH_WEST -> {
+                coords[0] = -radius;
+                coords[1] = radius;
+            }
+            case Corner.NORTH_WEST -> {
+                coords[0] = -radius;
+                coords[1] = -radius;
+            }
+            case Corner.NORTH_EAST -> {
+                coords[0] = radius;
+                coords[1] = -radius;
+            }
+        }
+        packet = cornerTemplates.get(corner).deepClone();
+        packet.getSectionPositions().write(0, new BlockPosition(coords[0], h, coords[1]));
+        return packet;
     }
 
     public PacketContainer writeChunkCoordinatesIntoPacket(AxisTemplate axis, int x, int y, int z) {

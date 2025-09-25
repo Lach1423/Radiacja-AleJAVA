@@ -167,7 +167,7 @@ public final class RadiacjaAleJAVA extends JavaPlugin implements Listener {
         config.options().copyDefaults(true);
         saveConfig();
 
-        updateLocationArrays(config.getInt("Radiation_Safe_Zone_Size"));
+        updateLocationArrays(config.getInt("Radiation_Safe_Zone_Size") + 1);
     }
 
     @EventHandler
