@@ -126,7 +126,7 @@ public class PacketSender {
         return (short) (x << 8 | z << 4 | y);
     }
 
-    public PacketContainer writeCoordinatesToCorners(int radius, Corner corner, int h) {
+    public PacketContainer writeCoordinatesToCorner(int radius, Corner corner, int h) {
         int[] coords = new int[2];
         PacketContainer packet;
         switch (corner) {
@@ -169,6 +169,15 @@ public class PacketSender {
             ProtocolLibrary.getProtocolManager().sendServerPacket(p, packet);
         } catch (InvocationTargetException e) {
             log.warning("Failed to send packet to " + p);
+        }
+    }
+    public void sendPackages(Player p, List<PacketContainer> packets) {
+        for (PacketContainer packet : packets) {
+            try {
+                ProtocolLibrary.getProtocolManager().sendServerPacket(p, packet);
+            } catch (InvocationTargetException e) {
+                log.warning("Failed to send packet to " + p);
+            }
         }
     }
 }

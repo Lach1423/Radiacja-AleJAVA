@@ -304,18 +304,29 @@ public final class RadiacjaAleJAVA extends JavaPlugin implements Listener {
         } //optimisation I think
 
         int radius = config.getInt("Radiation_Safe_Zone_Size") + 1;
-        int distanceXToWall = (int) (radius - Math.abs(player.getX()));
-        int distanceZToWall = (int) (radius - Math.abs(player.getZ()));
+        int distanceXToWall = (int) Math.abs(radius - player.getX());
+        int distanceZToWall = (int) Math.abs(radius - player.getZ());
         int playerViewDistance = Math.min(player.getClientViewDistance(), player.getViewDistance());
+        boolean skip = false;
 
         Renderer renderer = new Renderer(player, radius, playerViewDistance);
 
-        if (curedPlayers.containsKey(player) && distanceXToWall < 9 || distanceZToWall < 9) {
-            player.sendMessage("renderuje hole");
-            renderer.renderHole();
-        } else if (distanceXToWall <= playerViewDistance*16 || distanceZToWall <= playerViewDistance*16) {
-            renderer.renderWall();
-        } //else { skip }
+        if  (curedPlayers.containsKey(player)) {
+            if (distanceXToWall < 9) {
+                renderer.renderHole(AxisTemplate.X_AXIS,distanceXToWall);
+                skip = true;
+            }
+            if (distanceZToWall < 9) {
+                renderer.renderHole(AxisTemplate.Z_AXIS, distanceZToWall);
+                skip = true;
+            }
+        }
+        if (distanceXToWall <= playerViewDistance*16) {
+            renderer.renderWall(AxisTemplate.X_AXIS, skip);
+        }
+        if (distanceZToWall <= playerViewDistance*16) {
+            renderer.renderWall(AxisTemplate.Z_AXIS, skip);
+        }
 
 
     //        int pY = (int) p.getY();
