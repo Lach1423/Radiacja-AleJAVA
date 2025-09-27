@@ -63,9 +63,11 @@ public class Renderer {
             }
             packetSender.sendPackages(player, packets);
 
-            PacketSender.Corner corner = getCorner(coordinates, radius);
+            PacketSender.Corner corner = getCorner(coordinates, Math.floorDiv(radius, 16));
+            player.sendMessage(String.valueOf(corner));
             if (corner != null) {
                 packet = packetSender.writeCoordinatesToCorner(Math.floorDiv(radius, 16), corner, h);//render Corners
+                player.sendMessage("Wysyłam packet: " + packet);
                 packetSender.sendPackage(player, packet);
             }
         }
@@ -74,10 +76,10 @@ public class Renderer {
     public int[] calculateCoordinates() {
         int[] result = new int[4];
 
-        result[0] = Math.floorDiv(Math.max(-radius + 1, playerX - playerViewDistance), 16); //min //+ 1 for corners
-        result[1] = Math.floorDiv(Math.min(radius - 1, playerX + playerViewDistance), 16); //max //- 1 for corners
-        result[2] = Math.floorDiv(Math.max(-radius + 1, playerZ - playerViewDistance), 16); //min //+ 1 for corners
-        result[3] = Math.floorDiv(Math.min(radius - 1, playerZ + playerViewDistance), 16); //max //- 1 for corners
+        result[0] = Math.floorDiv(Math.max(-radius + 16, playerX - playerViewDistance), 16); //min //+ 1 for corners
+        result[1] = Math.floorDiv(Math.min(radius - 16, playerX + playerViewDistance), 16); //max //- 1 for corners
+        result[2] = Math.floorDiv(Math.max(-radius + 16, playerZ - playerViewDistance), 16); //min //+ 1 for corners
+        result[3] = Math.floorDiv(Math.min(radius - 16, playerZ + playerViewDistance), 16); //max //- 1 for corners
 
         return result;
     }
@@ -87,7 +89,7 @@ public class Renderer {
         else if (c[0] == -r + 1 && c[2] == r - 1) return PacketSender.Corner.SOUTH_WEST;
         else if (c[1] == r - 1 && c[3] == r - 1) return PacketSender.Corner.SOUTH_EAST;
         else if (c[1] == r - 1 && c[3] == -r + 1) return PacketSender.Corner.SOUTH_WEST;
-        else return null; // or throw exception if unexpected
+        else return null;
     }
 
     public void renderHole(PacketSender.AxisTemplate axis, int playerDistanceToWall) {

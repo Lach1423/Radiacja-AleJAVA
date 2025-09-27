@@ -50,7 +50,6 @@ public class PacketSender {
     public enum AxisTemplate {
         X_AXIS,
         Z_AXIS,
-        C_AXIS //Corner Axis
     }
     private final Logger log;
 
@@ -68,7 +67,7 @@ public class PacketSender {
                 locationArrayZAxis.add(setShortLocation(radius, he, i));
             }
         }
-        int radiusOffsetInChunk = radius % 16;
+        int radiusOffsetInChunk = Math.floorMod(radius, 16); ;
         points.clear();
         points.put(Corner.SOUTH_EAST, new int[]{radiusOffsetInChunk, radiusOffsetInChunk});
         points.put(Corner.SOUTH_WEST, new int[]{radiusOffsetInChunk - 1, radiusOffsetInChunk});
@@ -87,7 +86,7 @@ public class PacketSender {
                     cornerLocations.get(c).add(setShortLocation(i, h, radius));
                 }
                 for (int i = 0; i < points.get(c)[1]; i++) {
-                    cornerLocations.get(c).add(setShortLocation(i, h, radius));
+                    cornerLocations.get(c).add(setShortLocation(radius, h, i));
                 }
             }
         }
