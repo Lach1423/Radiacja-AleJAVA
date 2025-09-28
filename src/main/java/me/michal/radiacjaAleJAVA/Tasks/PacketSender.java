@@ -87,6 +87,7 @@ public class PacketSender {
                 }
                 for (int i = 0; i < points.get(c)[1]; i++) {
                     cornerLocations.get(c).add(setShortLocation(radius, h, i));
+                    123//Kornery są źle , chunki mają bloki zawsze od lewej górnej
                 }
             }
         }
