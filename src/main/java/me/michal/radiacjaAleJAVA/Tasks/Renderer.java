@@ -3,6 +3,7 @@ package me.michal.radiacjaAleJAVA.Tasks;
 import com.comphenix.protocol.events.PacketContainer;
 import org.bukkit.Axis;
 import org.bukkit.Location;
+import org.bukkit.block.data.BlockData;
 import org.bukkit.entity.Player;
 
 import java.util.*;
@@ -21,7 +22,7 @@ public class Renderer {
         this.player = player;
         this.radius = radius;
         this.playerX = (int) player.getX();
-        this.playerY = Math.floorDiv((int) player.getY(), 16);
+        this.playerY = (int) player.getY();
         this.playerZ = (int) player.getZ();
         this.radiusChunk = Math.floorDiv(radius, 16);
         this.playerViewDistance = playerViewDistance * 16;
@@ -35,6 +36,7 @@ public class Renderer {
         int chunkX;
         int chunkY;
         int chunkZ;
+        int playerY = Math.floorDiv(this.playerY, 16);
 
         for (int h = playerY - 2; h <= playerY + 2; h++) {
             chunkY = h;
@@ -92,50 +94,45 @@ public class Renderer {
         else return null;
     }
 
-    public void renderHole(PacketSender.AxisTemplate axis, int playerDistanceToWall) {
-        List<int[]> hole = getCircle(playerDistanceToWall);
-        /*switch (playerDistanceToWall) {
-            case 1 -> hole = getCircle(1);
-            case 2 -> hole = getCircle(2);
-            case 3 -> hole = getCircle(3);
-            case 4 -> hole = getCircle(4);
-            case 5 -> hole = getCircle(5);
-            case 6 -> hole = getCircle(6);
-            case 7 -> hole = getCircle(7);
-            case 8 -> hole = getCircle(8);
-        }*/
-        for (int h = (int) (player.getY() + 8); h >= player.getY(); h--) {
-            switch (axis) {
-                case X_AXIS -> {
-                    for (int i = playerX - 8; i < playerX + 8; i++) {
-                        if (!hole.contains(new int[] {i, h})) {
-                            Location loc = new Location(player.getWorld(), i, h, radius * Math.signum(playerZ));
-                            player.sendBlockChange(loc, loc.getBlock().getBlockData());
-                        }
-                    }
+    public void renderHole(PacketSender.AxisTemplate axis, int radius) {
+        List<int[]> hole = getCircle(radius);
+        int playerY = this.playerY + 1; //plus one for the hole center to be at player head
+        switch (axis) {
+            case X_AXIS -> {
+                for (int[] point : hole) {
+                    double x = playerX + point[0];
+                    double y = playerY + point[1];
+                    double z = this.radius * Math.signum(playerZ);
+                    sendBlock(player, x, y, z);
                 }
-                case Z_AXIS -> {
-                    for (int i = playerZ - 8; i < playerZ + 8; i++) {
-                        if (!hole.contains(new int[] {i, h})) {
-                            Location loc = new Location(player.getWorld(), radius * Math.signum(playerX), h, i);
-                            player.sendBlockChange(loc, loc.getBlock().getBlockData());
-                        }
-                    }
+            }
+            case Z_AXIS -> {
+                for (int[] point : hole) {
+                    double x = this.radius * Math.signum(playerX);
+                    double y = playerY + point[1];
+                    double z = playerZ + point[0];
+                    sendBlock(player, x, y, z);
                 }
             }
         }
     }
 
     private List<int[]> getCircle(int radius) {
-        List<int[]> points = new ArrayList<>();
-
-        for (int x = -radius; x <= radius; x++) {
-            for (int y = -radius; y <= radius; y++) {
-                if (x * x + y * y <= radius * radius) {
-                    points.add(new int[] {x, y});
-                }
+        ArrayList<int[]> points = new ArrayList<>();
+        for (int r = 0; r <= radius; r++) {
+            for (int angle = 0; angle < 360; angle++) {
+                double rad = Math.toRadians(angle);
+                int x = (int) Math.round(r * Math.cos(rad));
+                int y = (int) Math.round(r * Math.sin(rad));
+                points.add(new int[]{x, y});
             }
         }
         return points;
+    }
+
+    private void sendBlock(Player player, double x, double y, double z) {
+        Location location = new Location(player.getWorld(), x, y, z);
+        BlockData blockData = location.getBlock().getBlockData();
+        player.sendBlockChange(location, blockData);
     }
 }

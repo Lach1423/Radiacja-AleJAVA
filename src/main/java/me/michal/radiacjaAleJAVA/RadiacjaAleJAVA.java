@@ -304,8 +304,8 @@ public final class RadiacjaAleJAVA extends JavaPlugin implements Listener {
         } //optimisation I think
 
         int radius = config.getInt("Radiation_Safe_Zone_Size") + 1;
-        int distanceXToWall = (int) Math.abs(radius - player.getX());
-        int distanceZToWall = (int) Math.abs(radius - player.getZ());
+        int distanceXToWall = (int) Math.abs(radius - Math.abs(player.getX()));
+        int distanceZToWall = (int) Math.abs(radius - Math.abs(player.getZ()));
         int playerViewDistance = Math.min(player.getClientViewDistance(), player.getViewDistance());
         boolean skip = false;
 
@@ -313,11 +313,11 @@ public final class RadiacjaAleJAVA extends JavaPlugin implements Listener {
 
         if  (curedPlayers.containsKey(player)) {
             if (distanceXToWall < 9) {
-                renderer.renderHole(AxisTemplate.X_AXIS,distanceXToWall);
+                renderer.renderHole(AxisTemplate.X_AXIS, 9 - distanceXToWall);// 9 - 8 = 1r , 9 - 1 = 8r
                 skip = true;
             }
             if (distanceZToWall < 9) {
-                renderer.renderHole(AxisTemplate.Z_AXIS, distanceZToWall);
+                renderer.renderHole(AxisTemplate.Z_AXIS, 9 - distanceZToWall);
                 skip = true;
             }
         }
