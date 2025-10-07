@@ -9,11 +9,10 @@ import org.apache.commons.lang3.ArrayUtils;
 import org.bukkit.Material;
 import org.bukkit.entity.Player;
 
+import java.awt.*;
 import java.lang.reflect.InvocationTargetException;
-import java.util.ArrayList;
-import java.util.EnumMap;
+import java.util.*;
 import java.util.List;
-import java.util.Map;
 import java.util.logging.Logger;
 
 public class PacketSender {
@@ -27,7 +26,7 @@ public class PacketSender {
     public static final PacketContainer packetTemplateXAxis = new PacketContainer(PacketType.Play.Server.MULTI_BLOCK_CHANGE);
     public static final PacketContainer packetTemplateZAxis = new PacketContainer(PacketType.Play.Server.MULTI_BLOCK_CHANGE);
 
-    public enum Corner { NORTH_EAST, NORTH_WEST, SOUTH_EAST, SOUTH_WEST }
+    public enum Corner { SOUTH_EAST, SOUTH_WEST, NORTH_WEST, NORTH_EAST }
     public static Map<Corner, List<Short>> cornerLocations = new EnumMap<>(Corner.class);
     static {
         for (Corner c : Corner.values()) {
@@ -50,12 +49,15 @@ public class PacketSender {
     public enum AxisTemplate {
         X_AXIS,
         Z_AXIS,
-    }
+        }
+
     private final Logger log;
 
     public PacketSender() {
         log = Logger.getLogger("miguel");
     }
+
+
 
     public static void updateLocationArrays(int radius) {
         ArrayList<Short> locationArrayXAxis = new ArrayList<>();
@@ -67,12 +69,13 @@ public class PacketSender {
                 locationArrayZAxis.add(setShortLocation(radius, he, i));
             }
         }
-        int radiusOffsetInChunk = Math.floorMod(radius, 16); ;
+        int radiusOffsetInChunk = Math.floorMod(radius, 16);
+
         points.clear();
         points.put(Corner.SOUTH_EAST, new int[]{radiusOffsetInChunk, radiusOffsetInChunk});
         points.put(Corner.SOUTH_WEST, new int[]{radiusOffsetInChunk - 1, radiusOffsetInChunk});
-        points.put(Corner.NORTH_EAST, new int[]{radiusOffsetInChunk - 1, radiusOffsetInChunk - 1});
-        points.put(Corner.NORTH_WEST, new int[]{radiusOffsetInChunk, radiusOffsetInChunk - 1});
+        points.put(Corner.NORTH_WEST, new int[]{radiusOffsetInChunk -1 , radiusOffsetInChunk - 1});
+        points.put(Corner.NORTH_EAST, new int[]{radiusOffsetInChunk , radiusOffsetInChunk - 1});
 
         fillCornerArray(radius);
         writeArraysToPackets(locationArrayXAxis, locationArrayZAxis);
@@ -81,16 +84,30 @@ public class PacketSender {
     public static void fillCornerArray(int radius) {
         for (Corner c : Corner.values()) {
             cornerLocations.get(c).clear();
+            int[] point = points.get(c);
+            int[][] ranges = getRanges(c, point);
+
             for (int h = 0; h < 16; h++) {
-                for (int i = 0; i <= points.get(c)[0]; i++) {
-                    cornerLocations.get(c).add(setShortLocation(i, h, radius));
+                for (int x = ranges[0][0]; x < ranges[0][1]; x++) {
+                    cornerLocations.get(c).add(setShortLocation(x, h, radius));
                 }
-                for (int i = 0; i < points.get(c)[1]; i++) {
-                    cornerLocations.get(c).add(setShortLocation(radius, h, i));
-                    123//Kornery są źle , chunki mają bloki zawsze od lewej górnej
+                for (int z = ranges[1][0]; z < ranges[1][1]; z++) {
+                    cornerLocations.get(c).add(setShortLocation(radius, h, z));
                 }
             }
         }
+    }
+
+    private static int[][] getRanges(Corner c, int[] point) {
+        int x = point[0];
+        int y = point[1];
+
+        return switch (c) {
+            case SOUTH_EAST -> new int[][] { {0, x}, {0, y} };
+            case SOUTH_WEST -> new int[][] { {x, 16}, {0, y} };
+            case NORTH_WEST -> new int[][] { {x, 16}, {y, 16} };
+            case NORTH_EAST -> new int[][] { {0, x}, {y, 16} };
+        };
     }
 
     public static void writeArraysToPackets(ArrayList<Short> xAxisLocations, ArrayList<Short> zAxisLocations) {

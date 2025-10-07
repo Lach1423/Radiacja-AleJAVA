@@ -1,15 +1,21 @@
 package me.michal.radiacjaAleJAVA.Tasks;
 
 import com.comphenix.protocol.events.PacketContainer;
-import org.bukkit.Axis;
 import org.bukkit.Location;
+import org.bukkit.Material;
+import org.bukkit.World;
+import org.bukkit.block.Block;
+import org.bukkit.block.BlockState;
 import org.bukkit.block.data.BlockData;
 import org.bukkit.entity.Player;
 
+import java.awt.*;
 import java.util.*;
+import java.util.List;
 
 public class Renderer {
     Player player;
+    World world;
     int radius;
     int playerX;
     int playerY;
@@ -17,9 +23,21 @@ public class Renderer {
     int radiusChunk;
     int playerViewDistance;
     PacketSender packetSender;
+    private static final List<Set<Point>> circles = new ArrayList<>();
+    static {
+        for (int i = 0; i < 91; i++) {
+            circles.add(getDonut(0, i)); // cache circle of radius i
+        }
+    }
+    public enum MovementDirection {
+        APPROACHING,    // player getting closer
+        RECEDING,       // player getting away
+        PARALLEL        // moving horizontally along the wall
+    }
 
     public Renderer(Player player, int radius, int playerViewDistance) {
         this.player = player;
+        this.world = player.getWorld();
         this.radius = radius;
         this.playerX = (int) player.getX();
         this.playerY = (int) player.getY();
@@ -29,50 +47,116 @@ public class Renderer {
         this.packetSender = new PacketSender();
     }
 
-    public void renderWall(PacketSender.AxisTemplate axis, boolean skip) {
-        PacketContainer packet;
-        List<PacketContainer> packets = new ArrayList<>();
-        int[] coordinates = calculateCoordinates();
-        int chunkX;
-        int chunkY;
-        int chunkZ;
-        int playerY = Math.floorDiv(this.playerY, 16);
+    public void renderCircleXWall(MovementDirection direction ,int radius, boolean renderHole) {
+        List<BlockState> blocks = new ArrayList<>();
+        Set<Point> circle = null, donut = null, hole = null;
 
-        for (int h = playerY - 2; h <= playerY + 2; h++) {
-            chunkY = h;
-            switch (axis) {
-                case X_AXIS -> {
-                    chunkZ = (int) (radiusChunk * Math.signum(playerZ));
-                    for (int i = coordinates[0]; i <= coordinates[1]; i++) {
-                        chunkX = i;
-                        if (!skip || i < -1 || i > 1) {
-                            packet = packetSender.writeChunkCoordinatesIntoPacket(axis, chunkX, chunkY, chunkZ);
-                            packets.add(packet);
-                        }
-                    }
-                }
-                case Z_AXIS -> {
-                    chunkX = (int) (radiusChunk * Math.signum(playerX));
-                    for (int i = coordinates[2]; i <= coordinates[3]; i++) {
-                        chunkZ = i;
-                        if (skip && i >= -1 && i <= 1) {
-                            return;
-                        }
-                        packet = packetSender.writeChunkCoordinatesIntoPacket(PacketSender.AxisTemplate.Z_AXIS, chunkX, chunkY, chunkZ);
-                        packets.add(packet);
-                    }
-                }
-            }
-            packetSender.sendPackages(player, packets);
+        int z = (int) (this.radius * Math.signum(playerZ));
+        int baseY = playerY + 1; // head height
 
-            PacketSender.Corner corner = getCorner(coordinates, Math.floorDiv(radius, 16));
-            player.sendMessage(String.valueOf(corner));
-            if (corner != null) {
-                packet = packetSender.writeCoordinatesToCorner(Math.floorDiv(radius, 16), corner, h);//render Corners
-                player.sendMessage("Wysyłam packet: " + packet);
-                packetSender.sendPackage(player, packet);
+        switch (direction) {
+            case APPROACHING -> circle = circles.get(radius);
+            case RECEDING   -> donut = getDonut(radius + 1, radius + 7);
+            case PARALLEL   -> {
+                donut = getDonut(radius + 1, radius + 7);
+                circle = circles.get(radius);
             }
         }
+
+        if (renderHole) {
+            hole = getDonut(0, radius - 80);
+            for (Point point : hole) {
+                int x = playerX + point.x;
+                if (-this.radius < x && x < this.radius) continue;
+                int y = baseY + point.y;
+                Block block = world.getBlockAt(x, y, z);
+                blocks.add(block.getState());
+            }
+        }
+
+        if (donut != null) {
+            for (Point point : donut) {
+                int x = playerX + point.x;
+                if (-this.radius < x && x < this.radius) continue;
+                int y = baseY + point.y;
+                Block block = world.getBlockAt(x, y, z);
+                blocks.add(block.getState());
+            }
+        }
+
+        if (circle != null) {
+            if (hole != null) circle.removeAll(hole);
+            for (Point point : circle) {
+                int x = playerX + point.x;
+                if (-this.radius < x && x < this.radius) continue;
+                int y = baseY + point.y;
+                Block block = world.getBlockAt(x, y, z);
+                Material type = block.getType();
+                if (type == Material.AIR || type == Material.WATER) {
+                    BlockState state = block.getState();
+                    state.setType(Material.WHITE_STAINED_GLASS);
+                    blocks.add(state);
+                }
+            }
+        }
+
+        player.sendBlockChanges(blocks);
+    }
+
+    public void renderCircleZWall(MovementDirection direction, int radius, boolean renderHole) {
+        List<BlockState> blocks = new ArrayList<>();
+        Set<Point> circle = null, donut = null, hole = null;
+
+        int x = (int) (this.radius * Math.signum(playerX));
+        int baseY = playerY + 1; // head height
+
+        switch (direction) {
+            case APPROACHING -> circle = circles.get(radius);
+            case RECEDING   -> donut = getDonut(radius + 1, radius + 7);
+            case PARALLEL   -> {
+                donut = getDonut(radius + 1, radius + 7);
+                circle = circles.get(radius);
+            }
+        }
+
+        if (renderHole) {
+            hole = getDonut(0, radius - 80);
+            for (Point point : hole) {
+                int y = baseY + point.y;
+                int z = playerZ + point.x;
+                if (-this.radius < z && z < this.radius) continue;
+                Block block = world.getBlockAt(x, y, z);
+                blocks.add(block.getState());
+            }
+        }
+
+        if (donut != null) {
+            for (Point point : donut) {
+                int y = baseY + point.y;
+                int z = playerZ + point.x;
+                if (-this.radius < z && z < this.radius) continue;
+                BlockState state = world.getBlockAt(x, y, z).getState();
+                blocks.add(state);
+            }
+        }
+
+        if (circle != null) {
+            if (hole != null) circle.removeAll(hole);
+            for (Point point : circle) {
+                int y = baseY + point.y;
+                int z = playerZ + point.x;
+                if (-this.radius < z && z < this.radius) continue;
+                Block block = world.getBlockAt(x, y, z);
+                Material type = block.getType();
+                if (type == Material.AIR || type == Material.WATER) {
+                    BlockState state = block.getState();
+                    state.setType(Material.WHITE_STAINED_GLASS);
+                    blocks.add(state);
+                }
+            }
+        }
+
+        player.sendBlockChanges(blocks);
     }
 
     public int[] calculateCoordinates() {
@@ -94,8 +178,8 @@ public class Renderer {
         else return null;
     }
 
-    public void renderHole(PacketSender.AxisTemplate axis, int radius) {
-        List<int[]> hole = getCircle(radius);
+    public void renderHole(PacketSender.AxisTemplate axis, int holeRadius) {
+        List<int[]> hole = getCircle(holeRadius);
         int playerY = this.playerY + 1; //plus one for the hole center to be at player head
         switch (axis) {
             case X_AXIS -> {
@@ -117,7 +201,7 @@ public class Renderer {
         }
     }
 
-    private List<int[]> getCircle(int radius) {
+    public List<int[]> getCircle(int radius) {
         ArrayList<int[]> points = new ArrayList<>();
         for (int r = 0; r <= radius; r++) {
             for (int angle = 0; angle < 360; angle++) {
@@ -129,6 +213,21 @@ public class Renderer {
         }
         return points;
     }
+
+    private static Set<Point> getDonut(int minRadius, int maxRadius) {
+        Set<Point> donut = new HashSet<>();
+
+        for (int r = minRadius; r <= maxRadius; r++) {
+            for (int angle = 0; angle < 360; angle++) {
+                double rad = Math.toRadians(angle);
+                int x = (int) Math.round(r * Math.cos(rad));
+                int y = (int) Math.round(r * Math.sin(rad));
+                donut.add(new Point(x, y));
+            }
+        }
+        return donut;
+    }
+
 
     private void sendBlock(Player player, double x, double y, double z) {
         Location location = new Location(player.getWorld(), x, y, z);

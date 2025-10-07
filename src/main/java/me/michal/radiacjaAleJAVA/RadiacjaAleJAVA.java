@@ -13,6 +13,9 @@ import me.michal.radiacjaAleJAVA.Tasks.Renderer;
 import me.michal.radiacjaAleJAVA.Tasks.Things.Updater;
 import org.bukkit.*;
 import org.bukkit.Color;
+import org.bukkit.block.Block;
+import org.bukkit.block.BlockState;
+import org.bukkit.block.data.BlockData;
 import org.bukkit.boss.BarColor;
 import org.bukkit.boss.BarStyle;
 import org.bukkit.boss.BossBar;
@@ -36,6 +39,8 @@ import org.bukkit.event.EventHandler;
 import org.bukkit.event.Listener;
 import org.bukkit.potion.PotionType;
 import org.bukkit.scheduler.BukkitTask;
+import org.bukkit.util.Vector;
+import org.jetbrains.annotations.NotNull;
 
 import java.util.*;
 import java.util.List;
@@ -52,7 +57,7 @@ public final class RadiacjaAleJAVA extends JavaPlugin implements Listener {
     public static Map<Player, BossBar> curedBars = new HashMap<>();
     public static ArrayList<Player> affectedPlayers = new ArrayList<>();
     public static HashSet<Player> playersRTD = new HashSet<>();
-    public static Map<Player, Chunk> onlinePlayers = new HashMap<>();
+    public static Map<Player, Vector> onlinePlayers = new HashMap<>();
     public static int radius;
     public static int height;
     private final int[][] offsets1R = {
@@ -273,7 +278,8 @@ public final class RadiacjaAleJAVA extends JavaPlugin implements Listener {
     public void moveEvent(PlayerMoveEvent e) {
         Player p = e.getPlayer();
         enterRegion(p);
-        nearRadiation(p);
+        if (e.getTo().getBlockX() == e.getFrom().getBlockX() && e.getTo().getBlockY() == e.getFrom().getBlockY() && e.getTo().getBlockZ() == e.getFrom().getBlockZ()) return;
+        nearRadiation(p, e.getTo().getBlock(), e.getFrom().getBlock());
     }
 
     public void enterRegion(Player player) {
@@ -292,37 +298,33 @@ public final class RadiacjaAleJAVA extends JavaPlugin implements Listener {
         }
     }
 
-    public void nearRadiation(Player player) {
-        Chunk playerChunk = player.getChunk();
-        if (onlinePlayers.get(player).equals(playerChunk)) {
-            return;
-        } else {
-            onlinePlayers.put(player, playerChunk);
-        } //optimisation I think
-
+    public void nearRadiation(Player player, Block newBlock, Block oldBlock) {
         int radius = config.getInt("Radiation_Safe_Zone_Size") + 1;
-        int distanceXToWall = (int) Math.abs(radius - Math.abs(player.getX()));
-        int distanceZToWall = (int) Math.abs(radius - Math.abs(player.getZ()));
+        int playerDistanceToXWall = (int) Math.abs(radius - Math.abs(player.getZ()));
+        int playerDistanceToZWall = (int) Math.abs(radius - Math.abs(player.getX()));
         int playerViewDistance = Math.min(player.getClientViewDistance(), player.getViewDistance());
         boolean skip = false;
 
         Renderer renderer = new Renderer(player, radius, playerViewDistance);
 
         if  (curedPlayers.containsKey(player)) {
-            if (distanceXToWall < 9) {
-                renderer.renderHole(AxisTemplate.X_AXIS, 9 - distanceXToWall);// 9 - 8 = 1r , 9 - 1 = 8r
+            if (playerDistanceToXWall <= 9) {
+                renderer.renderHole(AxisTemplate.X_AXIS, 9 - playerDistanceToXWall);// 9 - 8 = 1r , 9 - 1 = 8r
                 skip = true;
             }
-            if (distanceZToWall < 9) {
-                renderer.renderHole(AxisTemplate.Z_AXIS, 9 - distanceZToWall);
+            if (playerDistanceToZWall <= 9) {
+                renderer.renderHole(AxisTemplate.Z_AXIS, 9 - playerDistanceToZWall);
                 skip = true;
             }
         }
-        if (distanceXToWall <= playerViewDistance*16) {
-            renderer.renderWall(AxisTemplate.X_AXIS, skip);
+        Renderer.MovementDirection direction;
+        if (playerDistanceToXWall <= 90) {
+            direction = getDirection(Math.abs(oldBlock.getZ()), Math.abs(newBlock.getZ()));
+            renderer.renderCircleXWall(direction, 90 - playerDistanceToXWall, skip);
         }
-        if (distanceZToWall <= playerViewDistance*16) {
-            renderer.renderWall(AxisTemplate.Z_AXIS, skip);
+        if (playerDistanceToZWall <= 90) {
+            direction = getDirection(Math.abs(oldBlock.getX()), Math.abs(newBlock.getX()));
+            renderer.renderCircleZWall(direction, 90 - playerDistanceToZWall, skip);
         }
 
 
@@ -516,11 +518,17 @@ public final class RadiacjaAleJAVA extends JavaPlugin implements Listener {
         }
     }*/
 
+    private Renderer.MovementDirection getDirection(int oldCoord, int newCoord) {
+        if (newCoord > oldCoord) return Renderer.MovementDirection.APPROACHING;
+        if (newCoord < oldCoord) return Renderer.MovementDirection.RECEDING;
+        return Renderer.MovementDirection.PARALLEL;
+    }
+
     @EventHandler
     public void joinEvent(PlayerJoinEvent e) {
         Player p = e.getPlayer();
-        onlinePlayers.put(p, p.getChunk());
-        nearRadiation(p);
+
+        nearRadiation(p, e.getPlayer().getLocation().getBlock(), e.getPlayer().getLocation().getBlock());
 
         UUID uuid = p.getUniqueId();
         if (offlinePlayers.containsKey(uuid)) {
