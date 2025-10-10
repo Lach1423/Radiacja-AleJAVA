@@ -570,7 +570,7 @@ public final class RadiacjaAleJAVA extends JavaPlugin implements Listener {
 
                         case "Respawn" -> openInventory(e.getPlayer(), "ChoosePlayer", "Respawn");//e.getPlayer().sendMessage(String.valueOf(Bukkit.getOfflinePlayer(a[1]).getRespawnLocation()));
                         case "Last Death" ->openInventory(e.getPlayer(), "ChoosePlayer", "LastDeath");//e.getPlayer().sendMessage(String.valueOf(Bukkit.getPlayer(a[1]).getLastDeathLocation()));
-                        case "Lightning" -> openInventory(e.getPlayer(), "ChoosePlayer", "Lighting");//e.getBlock().getWorld().strikeLightning(Bukkit.getPlayer(a[1]).getLocation());
+                        case "Lightning" -> openInventory(e.getPlayer(), "ChoosePlayer", "Lightning");//e.getBlock().getWorld().strikeLightning(Bukkit.getPlayer(a[1]).getLocation());
                         case "Refuse Death" -> openInventory(e.getPlayer(), "ChoosePlayer", "RefuseDeath");
                         case "Experience" -> {
                             e.getPlayer().setMetadata("ExperienceLevel", new FixedMetadataValue(this, a[1]));
@@ -707,63 +707,56 @@ public final class RadiacjaAleJAVA extends JavaPlugin implements Listener {
                 switch (p.getMetadata("ActionToExecute").getFirst().asString()) {
                     case "Position" -> {
                         p.sendMessage(choosenPlayer.getLocation().toString());
-                        p.closeInventory();
                     }
                     case "Respawn" -> {
                         p.sendMessage(choosenPlayer.getRespawnLocation().toString());
-                        p.closeInventory();
                     }
                     case "LastDeath" -> {
                         p.sendMessage(choosenPlayer.getLastDeathLocation().toString());
-                        p.closeInventory();
                     }
                     case "RefuseDeath" -> {
                         playersRTD.add(choosenPlayer);
-                        p.closeInventory();
                     }
                     case "AcceptDeath" -> {
                         playersRTD.remove(choosenPlayer);
-                        p.closeInventory();
                     }
                     case "Cooldown" -> {
                         choosenPlayer.setExpCooldown(p.getMetadata("Cooldown").getFirst().asInt());
                         p.removeMetadata("Cooldown", this);
-                        p.closeInventory();
                     }
                     case "DisplayName" -> {
                         choosenPlayer.setDisplayName(p.getMetadata("DisplayName").getFirst().asString());
                         p.removeMetadata("DisplayName", this);
-                        p.closeInventory();
                     }
                     case "Experience" -> {
                         choosenPlayer.setLevel(p.getMetadata("ExperienceLevel").getFirst().asInt());
                         p.removeMetadata("ExperienceLevel", this);
-                        p.closeInventory();
                     }
                     case "Chat" -> {
                         choosenPlayer.chat(p.getMetadata("Chat").getFirst().asString());
                         p.removeMetadata("Chat", this);
-                        p.closeInventory();
                     }
                     case "Lightning" -> {
                         p.getWorld().strikeLightning(choosenPlayer.getLocation());
-                        p.closeInventory();
                     }
                     case "Gamemode" -> {
                         if (p.hasMetadata("ChoosenGamemode")) {
                             gamemode = GameMode.valueOf(p.getMetadata("ChoosenGamemode").getFirst().asString());
                             choosenPlayer.setGameMode(gamemode);
                             p.removeMetadata("ChoosenGamemode", this);
-                            p.closeInventory();
                         } else {
                             p.setMetadata("ChoosenGamemode", new FixedMetadataValue(this, gamemode));
                             p.closeInventory();
-                            openInventory(p, "ChoosePlayer", "Gamemode");
+                            Bukkit.getScheduler().runTaskLater(this, () -> {
+                                openInventory(p, "ChoosePlayer", "Gamemode");
+                            }, 3L);
                         }
                     }
                 }
+                p.closeInventory();
             } catch (Exception ex) {
                 p.sendMessage(ex.toString());
+                p.closeInventory();
             }
         }
     }
