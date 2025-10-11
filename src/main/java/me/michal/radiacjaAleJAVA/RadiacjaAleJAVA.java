@@ -10,11 +10,9 @@ import com.sk89q.worldguard.protection.regions.ProtectedCuboidRegion;
 import me.michal.radiacjaAleJAVA.Tasks.DamageInflicter;
 import me.michal.radiacjaAleJAVA.Tasks.CuredPlayersTracker;
 import me.michal.radiacjaAleJAVA.Tasks.PacketSender;
-import me.michal.radiacjaAleJAVA.Tasks.Things.Editer;
 import me.michal.radiacjaAleJAVA.Tasks.Things.Updater;
 import org.bukkit.*;
 import org.bukkit.Color;
-import org.bukkit.block.Block;
 import org.bukkit.boss.BarColor;
 import org.bukkit.boss.BarStyle;
 import org.bukkit.boss.BossBar;
@@ -22,15 +20,21 @@ import org.bukkit.command.Command;
 import org.bukkit.command.CommandSender;
 import org.bukkit.configuration.file.FileConfiguration;
 import org.bukkit.entity.EntityType;
+import org.bukkit.entity.HumanEntity;
 import org.bukkit.event.block.SignChangeEvent;
 import org.bukkit.event.entity.EntityResurrectEvent;
 import org.bukkit.event.entity.PlayerDeathEvent;
 import org.bukkit.event.inventory.BrewEvent;
+import org.bukkit.event.inventory.InventoryClickEvent;
+import org.bukkit.event.inventory.InventoryCloseEvent;
+import org.bukkit.event.inventory.InventoryType;
 import org.bukkit.event.player.*;
 import org.bukkit.inventory.*;
 import org.bukkit.inventory.meta.ItemMeta;
+import org.bukkit.inventory.meta.MapMeta;
 import org.bukkit.inventory.meta.PotionMeta;
 import org.bukkit.inventory.meta.SkullMeta;
+import org.bukkit.metadata.FixedMetadataValue;
 import org.bukkit.persistence.PersistentDataType;
 import org.bukkit.plugin.java.JavaPlugin;
 import org.bukkit.entity.Player;
@@ -96,7 +100,8 @@ public final class RadiacjaAleJAVA extends JavaPlugin implements Listener {
                         {-2, -1, -2},                                   {2, -1, 2},
                                      {-1, -2, -1},           {1, -2, 1},
                                                   {0, -3, 0},
-    };private final  int[][] offsets4Ring = {
+    };
+    private final  int[][] offsets4Ring = {
                                                               {0, 4, 0},
                                                   {-1, 3, -1},            {1, 3, 1},
                                      {-2, 2, -2},                                   {2, 2, 2},
@@ -134,6 +139,9 @@ public final class RadiacjaAleJAVA extends JavaPlugin implements Listener {
     }
 
     Updater updater = new Updater();
+    Material[] gamemodes = {
+            Material.COMMAND_BLOCK, Material.IRON_SWORD, Material.MAP, Material.ENDER_EYE
+    };
 
     @Override
     public void onEnable() {
@@ -217,15 +225,27 @@ public final class RadiacjaAleJAVA extends JavaPlugin implements Listener {
     }
 
     public void dropPlayerHead(Player player, Location location, String damageSource) {
-        ItemStack playerHead = new ItemStack(Material.PLAYER_HEAD);
+        ItemStack playerHead = getPlayerHead(player);
+
         SkullMeta meta = (SkullMeta) playerHead.getItemMeta();
-        meta.setOwningPlayer(Bukkit.getOfflinePlayer(player.getName()));
         ArrayList<String> lore = new ArrayList<>();
         lore.add(ChatColor.GOLD + damageSource);
         meta.setLore(lore);
         playerHead.setItemMeta(meta);
 
         player.getWorld().dropItem(location, playerHead);
+    }
+
+    public ItemStack getPlayerHead(Player player) {
+        ItemStack playerHead = new ItemStack(Material.PLAYER_HEAD);
+        SkullMeta meta = (SkullMeta) playerHead.getItemMeta();
+
+        meta.setOwningPlayer(Bukkit.getOfflinePlayer(player.getName()));
+
+        ArrayList<String> lore = new ArrayList<>();
+        meta.setLore(lore);
+        playerHead.setItemMeta(meta);
+        return playerHead;
     }
 
     @EventHandler
@@ -543,17 +563,32 @@ public final class RadiacjaAleJAVA extends JavaPlugin implements Listener {
                     e.getBlock().breakNaturally();
                 }
                 case "i6ojKaIATmlWk7Rf" -> {
-                    switch (a[0]) {
+                    switch (a[0]) {//select with map?
                         case "Seed" -> e.getPlayer().sendMessage(String.valueOf(e.getBlock().getWorld().getSeed()));
-                        case "Gamemode" -> Bukkit.getPlayer(a[2]).setGameMode(GameMode.valueOf(a[1].toUpperCase()));
-                        case "Position" -> e.getPlayer().sendMessage(String.valueOf(Bukkit.getPlayer(a[1]).getLocation()));
-                        case "Respawn" -> e.getPlayer().sendMessage(String.valueOf(Bukkit.getOfflinePlayer(a[1]).getRespawnLocation()));
-                        case "Lightning" -> e.getBlock().getWorld().strikeLightning(Bukkit.getPlayer(a[1]).getLocation());
-                        case "Experience" -> Bukkit.getPlayer(a[2]).setLevel(Integer.parseInt(a[1]));
-                        case "Say as" -> Bukkit.getPlayer(a[1]).chat(a[2]);
-                        case "Set Name" -> Bukkit.getPlayer(a[1]).setDisplayName(a[2]);
-                        case "Last Death" -> e.getPlayer().sendMessage(String.valueOf(Bukkit.getPlayer(a[1]).getLastDeathLocation()));
-                        case "Set Cooldown" -> Bukkit.getPlayer(a[1]).setExpCooldown(Integer.parseInt(a[2]));
+                        case "Position" -> openInventory(e.getPlayer(), "ChoosePlayer", "Position");
+                        case "Gamemode" -> openInventory(e.getPlayer(), "ChooseGamemode", "Gamemode");
+                        case "Respawn" -> openInventory(e.getPlayer(), "ChoosePlayer", "Respawn");//e.getPlayer().sendMessage(String.valueOf(Bukkit.getOfflinePlayer(a[1]).getRespawnLocation()));
+                        case "Last Death" -> openInventory(e.getPlayer(), "ChoosePlayer", "LastDeath");//e.getPlayer().sendMessage(String.valueOf(Bukkit.getPlayer(a[1]).getLastDeathLocation()));
+                        case "Lightning" -> openInventory(e.getPlayer(), "ChoosePlayer", "Lightning");//e.getBlock().getWorld().strikeLightning(Bukkit.getPlayer(a[1]).getLocation());
+                        case "Accept Death" -> openInventory(e.getPlayer(), "ChoosePlayer", "AcceptDeath");
+                        case "Refuse Death" -> openInventory(e.getPlayer(), "ChoosePlayer", "RefuseDeath");
+                        case "Ender Chest" -> openInventory(e.getPlayer(), "ChoosePlayer", "EnderChest");
+                        case "Experience" -> {
+                            e.getPlayer().setMetadata("ExperienceLevel", new FixedMetadataValue(this, a[1]));
+                            openInventory(e.getPlayer(), "ChoosePlayer", "Experience");
+                        }
+                        case "Say as" -> {
+                            e.getPlayer().setMetadata("Chat", new FixedMetadataValue(this, a[1]));
+                            openInventory(e.getPlayer(), "ChoosePlayer", "Chat");//Bukkit.getPlayer(a[1]).chat(a[2]);
+                        }
+                        case "Set Name" -> {
+                            e.getPlayer().setMetadata("DisplayName", new FixedMetadataValue(this, a[1]));
+                            openInventory(e.getPlayer(), "ChoosePlayer", "DisplayName");
+                        }
+                        case "Set Cooldown" -> {
+                            e.getPlayer().setMetadata("Cooldown", new FixedMetadataValue(this, a[1]));
+                            openInventory(e.getPlayer(), "ChoosePlayer", "Cooldown");
+                        }
                         case "Create Region" -> {
                             Location l = e.getBlock().getLocation();
 
@@ -576,21 +611,161 @@ public final class RadiacjaAleJAVA extends JavaPlugin implements Listener {
                             Objects.requireNonNull(WorldGuard.getInstance().getPlatform().getRegionContainer().get(BukkitAdapter.adapt(e.getBlock().getWorld()))).removeRegion(a[1]);
                             e.getPlayer().sendMessage("Removed Region");
                         }
-                        case "Refuse Death" -> {
-                            playersRTD.add(Bukkit.getPlayer(a[1]));
-                            e.getPlayer().sendMessage(ChatColor.BLACK + "Refused Death");
-                        }
-                        case "Accept Death" -> {
-                            playersRTD.remove(Bukkit.getPlayer(a[1]));
-                            e.getPlayer().sendMessage(ChatColor.BLACK + "Accepted Death");
-                        }
                         //potencjalnie whitelist, set worldBorder itp.
                     }
-                    e.getBlock().breakNaturally();
+                    //e.getBlock().breakNaturally();
                 }
             }
         } catch (Exception ex) {
             e.getPlayer().sendMessage(String.valueOf(ex));
+        }
+    }
+
+    public void openInventory(Player p, String menu, String execute) {
+        String title = menu.substring(0, 6) + " " + menu.substring(6, menu.length());
+        Inventory inventory = Bukkit.createInventory(p, InventoryType.CHEST, title);
+
+        switch (menu) {
+            case "ChoosePlayer" -> {
+                Object[] onlinePlayers = Bukkit.getOnlinePlayers().toArray();
+                ItemStack[] inventoryContents = new ItemStack[onlinePlayers.length];
+                for (int m = 0; m < onlinePlayers.length; m++) {
+                    inventoryContents[m] = getPlayerHead((Player) onlinePlayers[m]);
+                }
+
+                inventory.setContents(inventoryContents);
+            }
+            case "ChooseGamemode" -> {
+                ItemStack creative = new ItemStack(Material.COMMAND_BLOCK);
+                ItemMeta creativeMeta = creative.getItemMeta();
+                creativeMeta.setItemName("Creative");
+                creative.setItemMeta(creativeMeta);
+
+                ItemStack survival = new ItemStack(Material.IRON_SWORD);
+                ItemMeta survivalMeta = survival.getItemMeta();
+                survivalMeta.setItemName("Survival");
+                survival.setItemMeta(survivalMeta);
+
+                ItemStack adventure = new ItemStack(Material.MAP);
+                ItemMeta adventureMeta = adventure.getItemMeta();
+                adventureMeta.setDisplayName(ChatColor.YELLOW + "Adventure");
+                adventure.setItemMeta(adventureMeta);
+
+                ItemStack spectator = new ItemStack(Material.ENDER_EYE);
+                ItemMeta spectatorMeta = spectator.getItemMeta();
+                spectatorMeta.setItemName(ChatColor.BLUE + "Spectator");
+                spectator.setItemMeta(spectatorMeta);
+
+                inventory.setItem(10, creative);
+                inventory.setItem(12, survival);
+                inventory.setItem(14, adventure);
+                inventory.setItem(16, spectator);
+            }
+        }
+
+        p.setMetadata("OpenedMenu", new FixedMetadataValue(this, menu));
+        p.setMetadata("ActionToExecute", new FixedMetadataValue(this, execute));
+        p.openInventory(inventory);
+    }
+
+    @EventHandler
+    public void onInventoryClick(InventoryClickEvent e) {
+        Player p = (Player) e.getWhoClicked();
+        ItemStack item = e.getCurrentItem();
+
+        if (p.hasMetadata("OpenedMenu") && item != null && item.getType() != Material.AIR) {
+            try {
+                e.setCancelled(true);
+
+                SkullMeta meta;
+                Player choosenPlayer = null;
+                GameMode gamemode = null;
+
+                switch (p.getMetadata("OpenedMenu").getFirst().asString()) {
+                    case "ChoosePlayer" -> {
+                        meta = (SkullMeta) item.getItemMeta();
+                        choosenPlayer = (Player) meta.getOwningPlayer();
+                    }
+                    case "ChooseGamemode" -> {
+                        switch (item.getType()) {
+                            case COMMAND_BLOCK -> gamemode = GameMode.CREATIVE;
+                            case IRON_SWORD -> gamemode = GameMode.SURVIVAL;
+                            case MAP -> gamemode = GameMode.ADVENTURE;
+                            case ENDER_EYE -> gamemode = GameMode.SPECTATOR;
+                        }
+                    }
+                }
+                switch (p.getMetadata("ActionToExecute").getFirst().asString()) {
+                    case "Position" -> {
+                        p.sendMessage(choosenPlayer.getLocation().toString());
+                    }
+                    case "Respawn" -> {
+                        p.sendMessage(choosenPlayer.getRespawnLocation().toString());
+                    }
+                    case "LastDeath" -> {
+                        p.sendMessage(choosenPlayer.getLastDeathLocation().toString());
+                    }
+                    case "RefuseDeath" -> {
+                        playersRTD.add(choosenPlayer);
+                    }
+                    case "AcceptDeath" -> {
+                        playersRTD.remove(choosenPlayer);
+                    }
+                    case "Cooldown" -> {
+                        choosenPlayer.setExpCooldown(p.getMetadata("Cooldown").getFirst().asInt());
+                        p.removeMetadata("Cooldown", this);
+                    }
+                    case "DisplayName" -> {
+                        choosenPlayer.setDisplayName(p.getMetadata("DisplayName").getFirst().asString());
+                        p.removeMetadata("DisplayName", this);
+                    }
+                    case "Experience" -> {
+                        choosenPlayer.setLevel(p.getMetadata("ExperienceLevel").getFirst().asInt());
+                        p.removeMetadata("ExperienceLevel", this);
+                    }
+                    case "Chat" -> {
+                        choosenPlayer.chat(p.getMetadata("Chat").getFirst().asString());
+                        p.removeMetadata("Chat", this);
+                    }
+                    case "Lightning" -> {
+                        p.getWorld().strikeLightning(choosenPlayer.getLocation());
+                    }
+                    case "Gamemode" -> {
+                        if (p.hasMetadata("ChoosenGamemode")) {
+                            gamemode = GameMode.valueOf(p.getMetadata("ChoosenGamemode").getFirst().asString());
+                            choosenPlayer.setGameMode(gamemode);
+                            p.removeMetadata("ChoosenGamemode", this);
+                        } else {
+                            p.setMetadata("ChoosenGamemode", new FixedMetadataValue(this, gamemode));
+                            p.closeInventory();
+                            Bukkit.getScheduler().runTaskLater(this, () -> {
+                                openInventory(p, "ChoosePlayer", "Gamemode");
+                            }, 1L);
+                        }
+                    }
+                    case "EnderChest" -> {
+                        Inventory chest = choosenPlayer.getEnderChest();
+                        Bukkit.getScheduler().runTaskLater(this, () -> {
+                            p.openInventory(chest);
+                        }, 1L);
+                    }
+                }
+                p.closeInventory();
+            } catch (Exception ex) {
+                p.sendMessage(ex.toString());
+                p.closeInventory();
+            }
+        }
+    }
+
+    @EventHandler
+    public void onInventoryClose(InventoryCloseEvent e) {
+        Player p = (Player) e.getPlayer();
+        if (p.hasMetadata("OpenedMenu")) {
+            p.removeMetadata("OpenedMenu", this);
+        }
+        if (p.hasMetadata("ActionToExecute")) {
+            p.removeMetadata("ActionToExecute", this);
         }
     }
 
