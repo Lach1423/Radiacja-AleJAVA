@@ -10,6 +10,7 @@ import com.sk89q.worldguard.protection.regions.ProtectedCuboidRegion;
 import me.michal.radiacjaAleJAVA.Tasks.DamageInflicter;
 import me.michal.radiacjaAleJAVA.Tasks.CuredPlayersTracker;
 import me.michal.radiacjaAleJAVA.Tasks.PacketSender;
+import me.michal.radiacjaAleJAVA.Tasks.Things.MapRender;
 import me.michal.radiacjaAleJAVA.Tasks.Things.Updater;
 import org.bukkit.*;
 import org.bukkit.Color;
@@ -135,10 +136,6 @@ public final class RadiacjaAleJAVA extends JavaPlugin implements Listener {
         waterPotion.setItemMeta(meta);
         return waterPotion;
     }
-
-    String[] options = {
-      "Gamemode", "Info", "Lightning", "Experience", "Refuse Death", "Accept Death", "Say as", "Set Name","Set Cooldown", "Create Region", "Remove Region"
-    };
 
     @Override
     public void onEnable() {
@@ -560,6 +557,7 @@ public final class RadiacjaAleJAVA extends JavaPlugin implements Listener {
                 }
                 case "i6ojKaIATmlWk7Rf" -> {
                     switch (a[0]) {
+                        case "Nigger" -> e.getPlayer().setMetadata("Choosing", new FixedMetadataValue(this, 4));
                         case "Seed" -> e.getPlayer().sendMessage(String.valueOf(e.getBlock().getWorld().getSeed()));
                         case "Info" -> openInventory(e.getPlayer(), "ChoosePlayer", "Info");
                         case "Gamemode" -> openInventory(e.getPlayer(), "ChooseGamemode", "Gamemode");
@@ -757,28 +755,24 @@ public final class RadiacjaAleJAVA extends JavaPlugin implements Listener {
     }
 
     @EventHandler
-    public void onHotbarScroll(PlayerItemHeldEvent e) {
+    public void onMapClick(PlayerInteractEvent e) {
         Player p = e.getPlayer();
-        e.setCancelled(true);
-        ItemStack map = p.getInventory().getItemInMainHand();
-        MapMeta mapMeta = (MapMeta) map.getItemMeta();
-        int currentOption = p.getMetadata("CurrentOption").getFirst().asInt();
-        if (e.getPreviousSlot() < e.getNewSlot()) { //Up
-            p.setMetadata("CurrentOption", new FixedMetadataValue(this, currentOption + 1));
-
-            MapView mapView = mapMeta.getMapView();
-            mapView.removeRenderer(mapView.getRenderers().get(0));
-            MapRenderer mapRenderer = new MapRenderer() {
-                @Override
-                public void render(@NotNull MapView mapView, @NotNull MapCanvas canvas, @NotNull Player player) {
-
-                    canvas.drawText(5, 5, MinecraftFont.Font, options[currentOption - 1] + "\n" + options[currentOption] + "\n" + options[currentOption + 1]);
-                }
-            };
-            mapView.addRenderer(mapRenderer);
-            mapMeta.setMapView(mapView);
+        if (p.getInventory().getItemInMainHand().getType() != Material.FILLED_MAP || !p.hasMetadata("Choosing") || e.getHand() != EquipmentSlot.HAND) {
+            return;
         }
-        map.setItemMeta(mapMeta);
+        int currentOption = (p.getMetadata("Choosing").getFirst().asInt() + 1) % 12;
+        switch (e.getAction()) {
+            case RIGHT_CLICK_AIR, RIGHT_CLICK_BLOCK -> {
+                MapView mapView = Bukkit.createMap(p.getWorld());
+                mapView.getRenderers().clear();
+                mapView.addRenderer(new MapRender(currentOption));
+                MapMeta mapMeta = ((MapMeta) p.getInventory().getItemInMainHand().getItemMeta());
+                mapMeta.setMapView(mapView);
+                p.getInventory().getItemInMainHand().setItemMeta(mapMeta);
+            } //Scroll
+            //case LEFT_CLICK_AIR, LEFT_CLICK_BLOCK -> ; //Choose
+        }
+        p.setMetadata("Choosing", new FixedMetadataValue(this, currentOption));
     }
 
     @Override
