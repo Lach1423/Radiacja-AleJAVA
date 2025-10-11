@@ -567,16 +567,17 @@ public final class RadiacjaAleJAVA extends JavaPlugin implements Listener {
                         case "Seed" -> e.getPlayer().sendMessage(String.valueOf(e.getBlock().getWorld().getSeed()));
                         case "Position" -> openInventory(e.getPlayer(), "ChoosePlayer", "Position");
                         case "Gamemode" -> openInventory(e.getPlayer(), "ChooseGamemode", "Gamemode");
-
                         case "Respawn" -> openInventory(e.getPlayer(), "ChoosePlayer", "Respawn");//e.getPlayer().sendMessage(String.valueOf(Bukkit.getOfflinePlayer(a[1]).getRespawnLocation()));
-                        case "Last Death" ->openInventory(e.getPlayer(), "ChoosePlayer", "LastDeath");//e.getPlayer().sendMessage(String.valueOf(Bukkit.getPlayer(a[1]).getLastDeathLocation()));
+                        case "Last Death" -> openInventory(e.getPlayer(), "ChoosePlayer", "LastDeath");//e.getPlayer().sendMessage(String.valueOf(Bukkit.getPlayer(a[1]).getLastDeathLocation()));
                         case "Lightning" -> openInventory(e.getPlayer(), "ChoosePlayer", "Lightning");//e.getBlock().getWorld().strikeLightning(Bukkit.getPlayer(a[1]).getLocation());
+                        case "Accept Death" -> openInventory(e.getPlayer(), "ChoosePlayer", "AcceptDeath");
                         case "Refuse Death" -> openInventory(e.getPlayer(), "ChoosePlayer", "RefuseDeath");
+                        case "Ender Chest" -> openInventory(e.getPlayer(), "ChoosePlayer", "EnderChest");
                         case "Experience" -> {
                             e.getPlayer().setMetadata("ExperienceLevel", new FixedMetadataValue(this, a[1]));
                             openInventory(e.getPlayer(), "ChoosePlayer", "Experience");
-                        }//Bukkit.getPlayer(a[2]).setLevel(Integer.parseInt(a[1]));
-                        case "Say as" ->{
+                        }
+                        case "Say as" -> {
                             e.getPlayer().setMetadata("Chat", new FixedMetadataValue(this, a[1]));
                             openInventory(e.getPlayer(), "ChoosePlayer", "Chat");//Bukkit.getPlayer(a[1]).chat(a[2]);
                         }
@@ -587,17 +588,7 @@ public final class RadiacjaAleJAVA extends JavaPlugin implements Listener {
                         case "Set Cooldown" -> {
                             e.getPlayer().setMetadata("Cooldown", new FixedMetadataValue(this, a[1]));
                             openInventory(e.getPlayer(), "ChoosePlayer", "Cooldown");
-                        }//Bukkit.getPlayer(a[1]).setExpCooldown(Integer.parseInt(a[2]));
-
-                        case "Accept Death" -> openInventory(e.getPlayer(), "ChoosePlayer", "AcceptDeath");
-                        /*{
-                            playersRTD.add(Bukkit.getPlayer(a[1]));
-                            e.getPlayer().sendMessage(ChatColor.BLACK + "Refused Death");
-                        */
-                        /*{
-                            playersRTD.remove(Bukkit.getPlayer(a[1]));
-                            e.getPlayer().sendMessage(ChatColor.BLACK + "Accepted Death");
-                        }*/
+                        }
                         case "Create Region" -> {
                             Location l = e.getBlock().getLocation();
 
@@ -749,8 +740,14 @@ public final class RadiacjaAleJAVA extends JavaPlugin implements Listener {
                             p.closeInventory();
                             Bukkit.getScheduler().runTaskLater(this, () -> {
                                 openInventory(p, "ChoosePlayer", "Gamemode");
-                            }, 3L);
+                            }, 1L);
                         }
+                    }
+                    case "EnderChest" -> {
+                        Inventory chest = choosenPlayer.getEnderChest();
+                        Bukkit.getScheduler().runTaskLater(this, () -> {
+                            p.openInventory(chest);
+                        }, 1L);
                     }
                 }
                 p.closeInventory();
