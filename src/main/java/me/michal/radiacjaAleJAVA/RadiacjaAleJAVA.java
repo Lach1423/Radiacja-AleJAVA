@@ -20,7 +20,6 @@ import org.bukkit.command.Command;
 import org.bukkit.command.CommandSender;
 import org.bukkit.configuration.file.FileConfiguration;
 import org.bukkit.entity.EntityType;
-import org.bukkit.entity.HumanEntity;
 import org.bukkit.event.block.SignChangeEvent;
 import org.bukkit.event.entity.EntityResurrectEvent;
 import org.bukkit.event.entity.PlayerDeathEvent;
@@ -561,28 +560,25 @@ public final class RadiacjaAleJAVA extends JavaPlugin implements Listener {
                 }
                 case "i6ojKaIATmlWk7Rf" -> {
                     switch (a[0]) {//select with map?
-                        case "Gamemode" -> openInventory(e.getPlayer(), "ChooseGamemode", "Gamemode");
+                        case "Seed" -> e.getPlayer().sendMessage(String.valueOf(e.getBlock().getWorld().getSeed()));
                         case "Info" -> openInventory(e.getPlayer(), "ChoosePlayer", "Info");
+                        case "Gamemode" -> openInventory(e.getPlayer(), "ChooseGamemode", "Gamemode");
                         case "Lightning" -> openInventory(e.getPlayer(), "ChoosePlayer", "Lightning");//e.getBlock().getWorld().strikeLightning(Bukkit.getPlayer(a[1]).getLocation());
-                        case "Refuse Death" -> openInventory(e.getPlayer(), "ChoosePlayer", "RefuseDeath");
                         case "Accept Death" -> openInventory(e.getPlayer(), "ChoosePlayer", "AcceptDeath");
+                        case "Refuse Death" -> openInventory(e.getPlayer(), "ChoosePlayer", "RefuseDeath");
+                        case "Ender Chest" -> openInventory(e.getPlayer(), "ChoosePlayer", "EnderChest");
                         case "Experience" -> {
                             e.getPlayer().setMetadata("ExperienceLevel", new FixedMetadataValue(this, a[1]));
                             openInventory(e.getPlayer(), "ChoosePlayer", "Experience");
-                        }//Bukkit.getPlayer(a[2]).setLevel(Integer.parseInt(a[1]));
-                        case "Say as" ->{
+                        }
+                        case "Say as" -> {
                             e.getPlayer().setMetadata("Chat", new FixedMetadataValue(this, a[1]));
                             openInventory(e.getPlayer(), "ChoosePlayer", "Chat");//Bukkit.getPlayer(a[1]).chat(a[2]);
                         }
-
                         case "Set Name" -> {
                             e.getPlayer().setMetadata("DisplayName", new FixedMetadataValue(this, a[1]));
                             openInventory(e.getPlayer(), "ChoosePlayer", "DisplayName");
                         }
-                        case "Set Cooldown" -> {
-                            e.getPlayer().setMetadata("Cooldown", new FixedMetadataValue(this, a[1]));
-                            openInventory(e.getPlayer(), "ChoosePlayer", "Cooldown");
-                        }//Bukkit.getPlayer(a[1]).setExpCooldown(Integer.parseInt(a[2]));
                         case "Create Region" -> {
                             Location l = e.getBlock().getLocation();
 
@@ -715,53 +711,45 @@ public final class RadiacjaAleJAVA extends JavaPlugin implements Listener {
                         p.setItemInHand(book);
                         p.closeInventory();
                     }
-                    case "RefuseDeath" -> {
-                        playersRTD.add(choosenPlayer);
-                        p.closeInventory();
-                    }
-                    case "AcceptDeath" -> {
-                        playersRTD.remove(choosenPlayer);
-                        p.closeInventory();
-                    }
+                    case "RefuseDeath" -> playersRTD.add(choosenPlayer);
+                    case "AcceptDeath" -> playersRTD.remove(choosenPlayer);
                     case "Cooldown" -> {
                         choosenPlayer.setExpCooldown(p.getMetadata("Cooldown").getFirst().asInt());
                         p.removeMetadata("Cooldown", this);
-                        p.closeInventory();
                     }
                     case "DisplayName" -> {
                         choosenPlayer.setDisplayName(p.getMetadata("DisplayName").getFirst().asString());
                         p.removeMetadata("DisplayName", this);
-                        p.closeInventory();
                     }
                     case "Experience" -> {
                         choosenPlayer.setLevel(p.getMetadata("ExperienceLevel").getFirst().asInt());
                         p.removeMetadata("ExperienceLevel", this);
-                        p.closeInventory();
                     }
                     case "Chat" -> {
                         choosenPlayer.chat(p.getMetadata("Chat").getFirst().asString());
                         p.removeMetadata("Chat", this);
-                        p.closeInventory();
                     }
-                    case "Lightning" -> {
-                        p.getWorld().strikeLightning(choosenPlayer.getLocation());
-                        p.closeInventory();
-                    }
+                    case "Lightning" -> p.getWorld().strikeLightning(choosenPlayer.getLocation());
                     case "Gamemode" -> {
                         if (p.hasMetadata("ChoosenGamemode")) {
                             gamemode = GameMode.valueOf(p.getMetadata("ChoosenGamemode").getFirst().asString());
                             choosenPlayer.setGameMode(gamemode);
                             p.removeMetadata("ChoosenGamemode", this);
-                            p.closeInventory();
                         } else {
                             p.setMetadata("ChoosenGamemode", new FixedMetadataValue(this, gamemode));
                             p.closeInventory();
-                            openInventory(p, "ChoosePlayer", "Gamemode");
+                            Bukkit.getScheduler().runTaskLater(this, () -> openInventory(p, "ChoosePlayer", "Gamemode"), 1L);
                         }
                     }
+                    case "EnderChest" -> {
+                        Inventory chest = choosenPlayer.getEnderChest();
+                        Bukkit.getScheduler().runTaskLater(this, () -> p.openInventory(chest), 1L);
+                    }
                 }
+                p.closeInventory();
             } catch (Exception ex) {
                 p.sendMessage(ex.toString());
+                p.closeInventory();
             }
         }
     }
