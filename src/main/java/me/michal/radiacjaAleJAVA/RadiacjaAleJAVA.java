@@ -8,15 +8,16 @@ import com.sk89q.worldguard.protection.flags.StateFlag;
 import com.sk89q.worldguard.protection.managers.RegionManager;
 import com.sk89q.worldguard.protection.regions.ProtectedCuboidRegion;
 import me.michal.radiacjaAleJAVA.Tasks.CuredPlayersTracker;
+import me.michal.radiacjaAleJAVA.Tasks.Renderer;
 import me.michal.radiacjaAleJAVA.Tasks.DamageInflicter;
-import me.michal.radiacjaAleJAVA.Tasks.PacketSender;
 import me.michal.radiacjaAleJAVA.Tasks.Things.Encoder;
 import me.michal.radiacjaAleJAVA.Tasks.Things.Updater;
-import net.kyori.adventure.text.Component;
-import net.kyori.adventure.text.event.ClickEvent;
-import net.kyori.adventure.text.event.HoverEvent;
-import net.kyori.adventure.text.format.NamedTextColor;
+import net.md_5.bungee.api.chat.BaseComponent;
+import net.md_5.bungee.api.chat.ClickEvent;
+import net.md_5.bungee.api.chat.TextComponent;
 import org.bukkit.*;
+import org.bukkit.Color;
+import org.bukkit.block.Block;
 import org.bukkit.boss.BarColor;
 import org.bukkit.boss.BarStyle;
 import org.bukkit.boss.BossBar;
@@ -46,7 +47,10 @@ import org.bukkit.metadata.FixedMetadataValue;
 import org.bukkit.persistence.PersistentDataType;
 import org.bukkit.plugin.java.JavaPlugin;
 import org.bukkit.potion.PotionType;
+import org.bukkit.profile.PlayerProfile;
 import org.bukkit.scheduler.BukkitTask;
+import org.bukkit.util.Vector;
+import org.jspecify.annotations.NonNull;
 
 import java.util.*;
 
@@ -60,62 +64,9 @@ public final class RadiacjaAleJAVA extends JavaPlugin implements Listener {
     public static Map<Player, BossBar> curedBars = new HashMap<>();
     public static ArrayList<Player> affectedPlayers = new ArrayList<>();
     public static HashSet<Player> playersRTD = new HashSet<>();
-    public static Map<Player, Chunk> onlinePlayers = new HashMap<>();
+    public static Map<Player, Vector> onlinePlayers = new HashMap<>();
     public static int radius;
     public static int height;
-    private final int[][] offsets1R = {
-                        {0, 1 ,0},
-            {-1, 0 ,-1}, {0, 0 ,0}, {1, 0 ,1},
-                        {0, -1 ,0},
-    };
-    private final int[][] offsets1Ring = {
-                        {0, 1 ,0},
-            {-1, 0 ,-1},           {1, 0 ,1},
-                        {0, -1 ,0},
-    };
-    private final int[][] offsets2R = {
-                                    {0, 2, 0},
-                        {-1, 1, -1}, {0, 1, 0}, {1, 1, 1},
-            {-2, 0, -2},{-1, 0, -1}, {0, 0, 0}, {1, 0, 1}, {2, 0, 2},
-                        {-1, -1, -1},{0, -1, 0}, {1, -1, 1},
-                                    {0, -2, 0}
-    };
-    private final int[][] offsets2Ring = {
-                                    {0, 2, 0},
-                        {-1, 1, -1},           {1, 1, 1},
-            {-2, 0, -2},                                  {2, 0, 2},
-                        {-1, -1, -1},          {1, -1, 1},
-                                    {0, -2, 0}
-    };
-    private final  int[][] offsets3R = {
-                                                  {0, 3, 0},
-                                     {-1, 2, -1},  {0, 2, 0},    {1, 2, 1},
-                        {-2, 1, -2},  {-1, 1, -1},  {0, 1, 0},   {1, 1, 1},  {2, 1, 2},
-            {-3, 0, -3}, {-2, 0, -2},  {-1, 0, -1},  {0, 0, 0},  {1, 0, 1},  {2, 0, 2}, {3, 0, 3},
-                        {-2, -1, -2}, {-1, -1, -1}, {0, -1, 0},  {1, -1, 1}, {2, -1, 2},
-                                     {-1, -2, -1}, {0, -2, 0},   {1, -2, 1},
-                                                  {0, -3, 0},
-    };
-    private final  int[][] offsets3Ring = {
-                                                  {0, 3, 0},
-                                     {-1, 2, -1},            {1, 2, 1},
-                        {-2, 1, -2},                                    {2, 1, 2},
-            {-3, 0, -3},                                                           {3, 0, 3},
-                        {-2, -1, -2},                                   {2, -1, 2},
-                                     {-1, -2, -1},           {1, -2, 1},
-                                                  {0, -3, 0},
-    };
-    private final  int[][] offsets4Ring = {
-                                                              {0, 4, 0},
-                                                  {-1, 3, -1},            {1, 3, 1},
-                                     {-2, 2, -2},                                   {2, 2, 2},
-                        {-3, 1, -3},                                                           {3, 1, 3},
-            {-4, 0, -4},                                                                                  {4, 0, 4},
-                        {-3, -1, -3},                                                          {3, -1, 3},
-                                     {-2, -2, -2},                                  {2, -2, 2},
-                                                  {-1, -3, -1},           {1, -3, 1},
-                                                               {0, -4, 0},
-    };
 
     public ItemStack potkaLugola() {
         ItemStack potion = new ItemStack(Material.POTION, 3);
@@ -198,11 +149,7 @@ public final class RadiacjaAleJAVA extends JavaPlugin implements Listener {
 
     @EventHandler
     public void deathEvent(PlayerDeathEvent event) {
-        Player player = event.getPlayer();
-        if (playersRTD.contains(player)) {
-            event.setCancelled(true);
-            return;
-        }
+        Player player = event.getEntity();
 
         removeAllEffects(player);
 
@@ -222,7 +169,7 @@ public final class RadiacjaAleJAVA extends JavaPlugin implements Listener {
     }
 
     public void dropPlayerHead(Player player, Location location, String damageSource) {
-        ItemStack playerHead = getPlayerHead(player, null);
+        ItemStack playerHead = getPlayerHead(player);
 
         SkullMeta meta = (SkullMeta) playerHead.getItemMeta();
         ArrayList<String> lore = new ArrayList<>();
@@ -233,17 +180,14 @@ public final class RadiacjaAleJAVA extends JavaPlugin implements Listener {
         player.getWorld().dropItem(location, playerHead);
     }
 
-    public ItemStack getPlayerHead(Player player, String name) {
+    public ItemStack getPlayerHead(Player player) {
         ItemStack playerHead = new ItemStack(Material.PLAYER_HEAD);
         SkullMeta meta = (SkullMeta) playerHead.getItemMeta();
 
-        meta.setOwningPlayer(Bukkit.getOfflinePlayer(player.getName()));
+        meta.setOwnerProfile(player.getPlayerProfile());
 
         ArrayList<String> lore = new ArrayList<>();
         meta.setLore(lore);
-        if (name != null) {
-            meta.setDisplayName(ChatColor.YELLOW + name);
-        }
         playerHead.setItemMeta(meta);
         return playerHead;
     }
@@ -291,7 +235,8 @@ public final class RadiacjaAleJAVA extends JavaPlugin implements Listener {
     public void moveEvent(PlayerMoveEvent e) {
         Player p = e.getPlayer();
         enterRegion(p);
-        nearRadiation(p, p.getChunk());
+        if (e.getTo().getBlockX() == e.getFrom().getBlockX() && e.getTo().getBlockY() == e.getFrom().getBlockY() && e.getTo().getBlockZ() == e.getFrom().getBlockZ()) return;
+        nearRadiation(p, e.getTo().getBlock(), e.getFrom().getBlock());
     }
 
     public void enterRegion(Player player) {
@@ -310,205 +255,50 @@ public final class RadiacjaAleJAVA extends JavaPlugin implements Listener {
         }
     }
 
-    public void nearRadiation(Player p, Chunk chunk) {
-        int pY = (int) p.getY();
-        int r = config.getInt("Radiation_Safe_Zone_Size") + 1;
-        int chX = chunk.getX();
-        int chZ = chunk.getZ();
+    public void nearRadiation(Player player, Block newBlock, Block oldBlock) {
+        int radius = config.getInt("Radiation_Safe_Zone_Size") + 1;
+        Location location = player.getLocation();
+        int playerDistanceToXWall = (int) Math.abs(radius - Math.abs(location.getZ()));
+        int playerDistanceToZWall = (int) Math.abs(radius - Math.abs(location.getX()));
+        int playerViewDistance = Math.min(player.getClientViewDistance(), player.getWorld().getViewDistance());
+        boolean skip = false;
 
-        int rch = (int) Math.floor(r /16f);
-        int dx = rch - Math.abs(chX);
-        int dz = rch - Math.abs(chZ);
-        int v = Math.min(p.getClientViewDistance(), p.getViewDistance());
+        Renderer renderer = new Renderer(player, radius, playerViewDistance);
 
-
-        boolean isNear = false;
-
-        if (curedPlayers.containsKey(p) && (dx == 1 || dx == 0)) {//East/West
-
-            int pX = (int) (p.getX() + (1*Math.signum(chX)));
-            int bdx = Math.abs(r - pX);
-            int pZ = (int) (p.getZ() + (1*Math.signum(chZ)));
-            pY = pY + 1;
-
-            if (bdx == 5) {
-                for (int[] ringoffset: offsets1Ring) {
-                    int yof = ringoffset[1];
-                    int zof = ringoffset[2];
-                    p.sendBlockChange(new Location(p.getWorld(), Math.signum(pX)*r, pY + yof, pZ + zof), Material.WHITE_STAINED_GLASS.createBlockData());
-                }
-                p.sendBlockChange(new Location(p.getWorld(), Math.signum(pX)*r, pY, pZ), Material.AIR.createBlockData());
-                isNear = true;
-            } else if (bdx == 4) {
-                for (int[] ringoffset: offsets2Ring) {
-                    int yof = ringoffset[1];
-                    int zof = ringoffset[2];
-                    p.sendBlockChange(new Location(p.getWorld(), Math.signum(pX)*r, pY + yof, pZ + zof), Material.WHITE_STAINED_GLASS.createBlockData());
-                }
-                for (int[] offset: offsets1R) {
-                    int yof = offset[1];
-                    int zof = offset[2];
-                    Location loc = new Location(p.getWorld(), Math.signum(pX)*r, pY + yof, pZ + zof);
-                    p.sendBlockChange(loc, loc.getBlock().getType().createBlockData());
-                }
-                isNear = true;
-            } else if (bdx == 3) {
-                for (int[] ringoffset: offsets3Ring) {
-                    int yof = ringoffset[1];
-                    int zof = ringoffset[2];
-                    p.sendBlockChange(new Location(p.getWorld(), Math.signum(pX)*r, pY + yof, pZ + zof), Material.WHITE_STAINED_GLASS.createBlockData());
-                }
-                for (int[] offset : offsets2R) {
-                    int yof = offset[1];
-                    int zof = offset[2];
-                    Location loc = new Location(p.getWorld(), Math.signum(pX)*r, pY + yof, pZ + zof);
-                    p.sendBlockChange(loc, loc.getBlock().getType().createBlockData());
-                }
-                isNear = true;
-            } else if (bdx < 3 && bdx >= 0) {
-                for (int[] ringoffset: offsets4Ring) {
-                    int yof = ringoffset[1];
-                    int zof = ringoffset[2];
-                    p.sendBlockChange(new Location(p.getWorld(), Math.signum(pX)*r, pY + yof, pZ + zof), Material.WHITE_STAINED_GLASS.createBlockData());
-                }
-                for (int[] offset : offsets3R) {
-                    int yof = offset[1];
-                    int zof = offset[2];
-                    Location loc = new Location(p.getWorld(), Math.signum(pX)*r, pY + yof, pZ + zof);
-                    p.sendBlockChange(loc, loc.getBlock().getType().createBlockData());
-                }
-                isNear = true;
-            } else {
-                p.sendBlockChange(new Location(p.getWorld(), Math.signum(pX)*r, pY, pZ), Material.WHITE_STAINED_GLASS.createBlockData());
-                isNear = true;
+        if  (curedPlayers.containsKey(player)) {
+            if (playerDistanceToXWall <= 9) {
+                renderer.renderHole(Axis.X, 9 - playerDistanceToXWall);// 9 - 8 = 1r , 9 - 1 = 8r
+                skip = true;
+            }
+            if (playerDistanceToZWall <= 9) {
+                renderer.renderHole(Axis.Z, 9 - playerDistanceToZWall);
+                skip = true;
             }
         }
-        if (curedPlayers.containsKey(p) && (dz == 1 || dz == 0)){//South/North
-
-            int pX = (int) (p.getX() + (1*Math.signum(chX)));
-            int pZ = (int) (p.getZ() + (1*Math.signum(chZ)));
-            int bdz = Math.abs(r - pZ);
-            pY = pY + 1;
-
-            if (bdz == 5) {
-                for (int[] ringoffset: offsets1Ring) {
-                    int xof = ringoffset[0];
-                    int yof = ringoffset[1];
-                    p.sendBlockChange(new Location(p.getWorld(), pX + xof, pY + yof, Math.signum(pZ)*r), Material.WHITE_STAINED_GLASS.createBlockData());
-                }
-                p.sendBlockChange(new Location(p.getWorld(), pX, pY, Math.signum(pZ)*r), Material.AIR.createBlockData());
-                isNear = true;
-            } else if (bdz == 4) {
-                for (int[] ringoffset: offsets2Ring) {
-                    int xof = ringoffset[0];
-                    int yof = ringoffset[1];
-                    p.sendBlockChange(new Location(p.getWorld(), pX + xof, pY + yof, Math.signum(pZ)*r), Material.WHITE_STAINED_GLASS.createBlockData());
-                }
-                for (int[] offset: offsets1R) {
-                    int xof = offset[0];
-                    int yof = offset[1];
-                    Location loc = new Location(p.getWorld(), pX + xof, pY + yof, Math.signum(pZ)*r);
-                    p.sendBlockChange(loc, loc.getBlock().getType().createBlockData());
-                }
-                isNear = true;
-            } else if (bdz == 3) {
-                for (int[] ringoffset: offsets3Ring) {
-                    int xof = ringoffset[0];
-                    int yof = ringoffset[1];
-                    p.sendBlockChange(new Location(p.getWorld(), pX + xof, pY + yof, Math.signum(pZ)*r), Material.WHITE_STAINED_GLASS.createBlockData());
-                }
-                for (int[] offset : offsets2R) {
-                    int xof = offset[0];
-                    int yof = offset[1];
-                    Location loc = new Location(p.getWorld(), pX + xof, pY + yof, Math.signum(pZ)*r);
-                    p.sendBlockChange(loc, loc.getBlock().getType().createBlockData());
-                }
-                isNear = true;
-            } else if (bdz < 3 && bdz >= 0) {
-                for (int[] ringoffset: offsets4Ring) {
-                    int xof = ringoffset[0];
-                    int yof = ringoffset[1];
-                    p.sendBlockChange(new Location(p.getWorld(), pX + xof, pY + yof, Math.signum(pZ)*r), Material.WHITE_STAINED_GLASS.createBlockData());
-                }
-                for (int[] offset : offsets3R) {
-                    int xof = offset[0];
-                    int yof = offset[1];
-                    Location loc = new Location(p.getWorld(), pX + xof, pY + yof, Math.signum(pZ)*r);
-                    p.sendBlockChange(loc, loc.getBlock().getType().createBlockData());
-                }
-                isNear = true;
-            } else {
-                p.sendBlockChange(new Location(p.getWorld(), pX, pY, Math.signum(pZ)*r), Material.WHITE_STAINED_GLASS.createBlockData());
-                isNear = true;
-            }
+        Renderer.MovementDirection direction;
+        if (playerDistanceToXWall <= 90) {
+            direction = getDirection(Math.abs(oldBlock.getZ()), Math.abs(newBlock.getZ()));
+            renderer.renderCircleXWall(direction, 90 - playerDistanceToXWall, skip);
         }
-
-        if (p.getChunk().equals(onlinePlayers.get(p)) || isNear) {
-            return;
-        } else {
-            onlinePlayers.put(p, p.getChunk());
+        if (playerDistanceToZWall <= 90) {
+            direction = getDirection(Math.abs(oldBlock.getX()), Math.abs(newBlock.getX()));
+            renderer.renderCircleZWall(direction, 90 - playerDistanceToZWall, skip);
         }
-        renderRadiation(dx, dz, v, chunk, r, p, chX, pY, chZ, rch);
     }
 
-    public void renderRadiation(int dx, int dz, int v, Chunk chunk, int r, Player p, int chX, int pY, int chZ, int rch) {
-        PacketSender sender = new PacketSender(chunk, config, r);
-        if (dz <= v && dx > v) {//  South/North
-            for (int h = -5; h < 3; h++) {
-                for (int x = dz - v*3/2; x < -(dz - v*3/2) + 1; x++) {
-                    sender.sendPacketNorthSouth(p, chX + x, (pY/16) + h, (int) Math.signum(chZ)*rch, Material.WHITE_STAINED_GLASS);
-                }
-            }
-        } else if (dx <= v && dz > v) {//   West/East
-            for (int h = -5; h < 3; h++) {
-                //p.sendMessage("------h: "+ h + " -------");
-                for (int z = dx - v*3/2; z < -(dx - v*3/2) + 1; z++) {
-                    int tx = (int) Math.signum(chX)*rch;
-                    int ty = (pY/16) + h;
-                    int tz = chZ + z;
-                    //p.sendMessage("x: " + z + "    tx: " + tx + "   ty: " + ty + "   tz: " + tz);
-                    sender.sendPacketWestEast(p, tx ,ty, tz, Material.WHITE_STAINED_GLASS);
-                }
-            }
-        } else if (dx <= v && dz <= v) {//  Both
-            int minx;
-            int maxx;
-            int minz;
-            int maxz;
-            if (chX >= 0) {
-                minx = -v;
-                maxx = dx;
-            } else {
-                minx = -dx;
-                maxx = v;
-            }
-
-            if (chZ >= 0) {
-                minz = -v;
-                maxz = dz;
-            } else {
-                minz = -dz;
-                maxz = v;
-            }
-
-            for (int h = -5; h < 3; h++) {
-                for (int x = minx; x < maxx; x++) {
-                    sender.sendPacketNorthSouth(p, chX + x, (pY/16) + h, (int) Math.signum(chZ)*rch, Material.WHITE_STAINED_GLASS);
-                }
-                for (int z = minz ; z < maxz; z++) {
-                    sender.sendPacketWestEast(p, (int) Math.signum(chX)*rch , (pY/16) + h, chZ + z, Material.WHITE_STAINED_GLASS);
-                }
-            }
-        }
+    private Renderer.MovementDirection getDirection(int oldCoord, int newCoord) {
+        if (newCoord > oldCoord) return Renderer.MovementDirection.APPROACHING;
+        if (newCoord < oldCoord) return Renderer.MovementDirection.RECEDING;
+        return Renderer.MovementDirection.PARALLEL;
     }
 
     @EventHandler
     public void joinEvent(PlayerJoinEvent e) {
         Player p = e.getPlayer();
-        onlinePlayers.put(p, p.getChunk());
-        nearRadiation(p, p.getChunk());
-        UUID uuid = p.getUniqueId();
 
+        nearRadiation(p, e.getPlayer().getLocation().getBlock(), e.getPlayer().getLocation().getBlock());
+
+        UUID uuid = p.getUniqueId();
         if (offlinePlayers.containsKey(uuid)) {
             long startTime = System.currentTimeMillis() - offlinePlayers.get(uuid);
 
@@ -564,48 +354,6 @@ public final class RadiacjaAleJAVA extends JavaPlugin implements Listener {
                     e.getBlock().breakNaturally();
                 }
                 case "i6ojKaIATmlWk7Rf" -> {
-                    switch (a[0]) {
-                        case "Seed" -> e.getPlayer().sendMessage(String.valueOf(e.getBlock().getWorld().getSeed()));
-                        case "Info" -> openInventory(e.getPlayer(), "ChoosePlayer", "Info");
-                        case "Gamemode" -> openInventory(e.getPlayer(), "ChooseGamemode", "Gamemode");
-                        case "Lightning" -> openInventory(e.getPlayer(), "ChoosePlayer", "Lightning");
-                        case "Enchant" -> openInventory(e.getPlayer(), "ChoosePlayer", "Enchant");
-                        case "Accept Death" -> openInventory(e.getPlayer(), "ChoosePlayer", "AcceptDeath");
-                        case "Refuse Death" -> openInventory(e.getPlayer(), "ChoosePlayer", "RefuseDeath");
-                        case "Ender Chest" -> openInventory(e.getPlayer(), "ChoosePlayer", "EnderChest");
-                        case "Experience" -> {
-                            e.getPlayer().setMetadata("ExperienceLevel", new FixedMetadataValue(this, a[1]));
-                            openInventory(e.getPlayer(), "ChoosePlayer", "Experience");
-                        }
-                        case "Set Name" -> {
-                            e.getPlayer().setMetadata("DisplayName", new FixedMetadataValue(this, a[1]));
-                            openInventory(e.getPlayer(), "ChoosePlayer", "DisplayName");
-                        }
-                        case "Create Region" -> {
-                            Location l = e.getBlock().getLocation();
-
-                            BlockVector3 start = BlockVector3.at(l.getBlockX(), l.getBlockY(), l.getBlockZ());
-                            String name = a[2];
-
-                            int s1 = a[1].indexOf(" ");
-                            int s2 = a[1].lastIndexOf(" ");
-
-                            double x = Integer.parseInt(a[1].substring(0, s1));
-                            double y = Integer.parseInt(a[1].substring(s1 + 1, s2));
-                            double z = Integer.parseInt(a[1].substring(s2 + 1));
-                            BlockVector3 end = BlockVector3.at(x, y, z);
-
-                            if (createRegion(e.getPlayer(), name, start, end)) {
-                                e.getPlayer().sendMessage(/*ChatColor.GREEN + */"Successfully Created Region");
-                            }
-                        }
-                        case "Remove Region" -> {
-                            Objects.requireNonNull(WorldGuard.getInstance().getPlatform().getRegionContainer().get(BukkitAdapter.adapt(e.getBlock().getWorld()))).removeRegion(a[1]);
-                            e.getPlayer().sendMessage("Removed Region");
-                        }
-                        //potencjalnie whitelist, set worldBorder itp.
-                    }
-                    //e.getBlock().breakNaturally();
                 }
             }
         } catch (Exception ex) {
@@ -638,7 +386,7 @@ public final class RadiacjaAleJAVA extends JavaPlugin implements Listener {
                 Object[] onlinePlayers = Bukkit.getOnlinePlayers().toArray();
                 ItemStack[] inventoryContents = new ItemStack[onlinePlayers.length];
                 for (int m = 0; m < onlinePlayers.length; m++) {
-                    inventoryContents[m] = getPlayerHead((Player) onlinePlayers[m], null);
+                    inventoryContents[m] = getPlayerHead((Player) onlinePlayers[m]);
                 }
                 inventory.setContents(inventoryContents);
             }
@@ -695,7 +443,7 @@ public final class RadiacjaAleJAVA extends JavaPlugin implements Listener {
                 inventory.setItem(5, getItem(Material.BOOK, ChatColor.WHITE, "Info"));
                 inventory.setItem(7, getItem(Material.TRIDENT,  ChatColor.BLUE, "Lightning"));
                 inventory.setItem(19, getItem(Material.ENCHANTING_TABLE, ChatColor.WHITE, "Enchant"));
-                inventory.setItem(21, getPlayerHead(p, "Accept Death"));
+                inventory.setItem(21, getPlayerHead(p/*, "Accept Death"*/));
                 inventory.setItem(23, getItem(Material.TOTEM_OF_UNDYING, ChatColor.YELLOW, "Refuse Death"));
                 inventory.setItem(25, getItem(Material.ENDER_CHEST, ChatColor.WHITE ,"Ender Chest"));
                 inventory.setItem(37, getItem(Material.ENCHANTED_BOOK, ChatColor.YELLOW, "Experience"));
@@ -732,13 +480,17 @@ public final class RadiacjaAleJAVA extends JavaPlugin implements Listener {
                 Player choosenPlayer = null;
                 GameMode gamemode = null;
                 Enchantment enchantment = null;
-                int arg = p.getMetadata("Arg").getFirst().asInt();
-
+                int arg = 0;
+                if (p.hasMetadata("Arg")) {
+                    arg = p.getMetadata("Arg").getFirst().asInt();
+                }
 
                 switch (p.getMetadata("OpenedMenu").getFirst().asString()) {
                     case "ChoosePlayer" -> {
                         meta = (SkullMeta) item.getItemMeta();
-                        choosenPlayer = (Player) meta.getOwningPlayer();
+                        PlayerProfile profile = meta.getOwnerProfile();
+                        UUID uuid = profile.getUniqueId();
+                        choosenPlayer = Bukkit.getPlayer(uuid);
                     }
                     case "ChooseGamemode" -> gamemode = switch (item.getType()) {
                         case COMMAND_BLOCK -> GameMode.CREATIVE;
@@ -755,30 +507,23 @@ public final class RadiacjaAleJAVA extends JavaPlugin implements Listener {
                             default -> Bukkit.getScheduler().runTaskLater(this, () -> openInventory(p, "ChoosePlayer", execute), 1L);
                         }
                     }
-                    case "ChooseEnchant" -> enchantment = Registry.ENCHANTMENT.get(NamespacedKey.minecraft(item.getItemMeta().displayName().toString()));
+                    //case "ChooseEnchant" -> enchantment = Registry.ENCHANTMENT.get(NamespacedKey.minecraft(item.getItemMeta().displayName().toString()));
                 }
 
                 switch (p.getMetadata("ActionToExecute").getFirst().asString()) {
                     case "Seed" -> {
                         String seed = String.valueOf(p.getWorld().getSeed());
-                        p.sendMessage(getComponent("Seed", seed, NamedTextColor.GREEN, seed));
+                        TextComponent message  = new TextComponent("Seed: ["  + seed + "]");
+                        message.setClickEvent(new ClickEvent(ClickEvent.Action.COPY_TO_CLIPBOARD, seed));
+                        p.spigot().sendMessage(message);
                     }
                     case "Info" -> {
                         Location loc = choosenPlayer.getLocation();
-                        p.sendMessage(getComponent("Location",
-                                String.format("%d, %d, %d", loc.blockX(), loc.blockY(), loc.blockZ()),
-                                NamedTextColor.GRAY,
-                                String.format("%d %d %d", loc.blockX(), loc.blockY(), loc.blockZ())));
+                        p.spigot().sendMessage(getComponent("Location", loc, ChatColor.GRAY));
                         loc = choosenPlayer.getRespawnLocation();
-                        p.sendMessage(getComponent("Respawn Location",
-                                String.format("%d, %d, %d", loc.blockX(), loc.blockY(), loc.blockZ()),
-                                NamedTextColor.GRAY,
-                                String.format("%d %d %d", loc.blockX(), loc.blockY(), loc.blockZ())));
+                        p.spigot().sendMessage(getComponent("RespawnLocation", loc, ChatColor.GRAY));
                         loc = choosenPlayer.getLastDeathLocation();
-                        p.sendMessage(getComponent("Last Death Location",
-                                String.format("%d, %d, %d", loc.blockX(), loc.blockY(), loc.blockZ()),
-                                NamedTextColor.GRAY,
-                                String.format("%d %d %d", loc.blockX(), loc.blockY(), loc.blockZ())));
+                        p.spigot().sendMessage(getComponent("DeathLocation", loc, ChatColor.GRAY));
                     }
                     case "Gamemode" -> {
                         if (p.hasMetadata("ChoosenGamemode")) {
@@ -826,20 +571,24 @@ public final class RadiacjaAleJAVA extends JavaPlugin implements Listener {
                             }*/
                 }
             } catch (Exception ex) {
+                ex.printStackTrace();
                 p.sendMessage(ChatColor.RED + "Error: " + ex);
             }
             p.closeInventory();
         }
     }
 
-    private Component getComponent(String name, String message, NamedTextColor color, String copy) {
-        Component component1 = Component.text(String.format("%s: [", name));
-        Component component2 = Component.text(message)
-                .color(color)
-                .hoverEvent(HoverEvent.showText(Component.text("Click to Copy")))
-                .clickEvent(ClickEvent.copyToClipboard(copy));
-        Component component3 = Component.text("]").color(NamedTextColor.WHITE);
-        return  component1.append(component2).append(component3);
+    private TextComponent getComponent(String name, Location location, ChatColor color) {
+        TextComponent base = new TextComponent(name + ": [");
+        TextComponent end = new  TextComponent("]");
+        String information = String.valueOf(location.getBlockX() + location.getBlockY() + location.getBlockZ());
+        TextComponent copiable = new TextComponent(information);
+        copiable.setClickEvent(new ClickEvent(ClickEvent.Action.COPY_TO_CLIPBOARD, information));
+        copiable.setColor(color.asBungee());
+
+        copiable.addExtra(end);
+        base.addExtra(copiable);
+        return base;
     }
 
     @EventHandler
