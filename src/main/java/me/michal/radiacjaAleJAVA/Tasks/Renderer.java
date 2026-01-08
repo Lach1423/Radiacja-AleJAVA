@@ -21,7 +21,6 @@ public class Renderer {
     int playerY;
     int playerZ;
     int radiusChunk;
-    int playerViewDistance;
     private static final List<Set<Point>> circles = new ArrayList<>();
     static {
         for (int i = 0; i < 91; i++) {
@@ -34,7 +33,7 @@ public class Renderer {
         PARALLEL        // moving horizontally along the wall
     }
 
-    public Renderer(Player player, int radius, int playerViewDistance) {
+    public Renderer(Player player, int radius) {
         this.player = player;
         this.world = player.getWorld();
         this.radius = radius;
@@ -43,7 +42,6 @@ public class Renderer {
         this.playerY = playerLocation.getBlockY();
         this.playerZ = playerLocation.getBlockZ();
         this.radiusChunk = Math.floorDiv(radius, 16);
-        this.playerViewDistance = playerViewDistance * 16;
     }
 
     public void renderCircleXWall(MovementDirection direction ,int radius, boolean renderHole) {
