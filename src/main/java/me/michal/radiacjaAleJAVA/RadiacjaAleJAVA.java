@@ -13,6 +13,7 @@ import me.michal.radiacjaAleJAVA.Tasks.Renderer;
 import me.michal.radiacjaAleJAVA.Tasks.Things.Updater;
 import org.bukkit.*;
 import org.bukkit.Color;
+import org.bukkit.block.Block;
 import org.bukkit.boss.BarColor;
 import org.bukkit.boss.BarStyle;
 import org.bukkit.boss.BossBar;
@@ -39,6 +40,7 @@ import org.bukkit.event.Listener;
 import org.bukkit.potion.PotionType;
 import org.bukkit.scheduler.BukkitTask;
 import org.bukkit.util.Vector;
+import org.jspecify.annotations.NonNull;
 
 import java.util.*;
 import java.util.List;
@@ -139,10 +141,6 @@ public final class RadiacjaAleJAVA extends JavaPlugin implements Listener {
     @EventHandler
     public void deathEvent(PlayerDeathEvent event) {
         Player player = event.getEntity();
-        /*if (playersRTD.contains(player)) {
-            event.setCancelled(true);
-            return;
-        }*/
 
         removeAllEffects(player);
 
@@ -177,7 +175,7 @@ public final class RadiacjaAleJAVA extends JavaPlugin implements Listener {
         ItemStack playerHead = new ItemStack(Material.PLAYER_HEAD);
         SkullMeta meta = (SkullMeta) playerHead.getItemMeta();
 
-        meta.setOwningPlayer(Bukkit.getOfflinePlayer(player.getName()));
+        meta.setOwnerProfile(player.getPlayerProfile());
 
         ArrayList<String> lore = new ArrayList<>();
         meta.setLore(lore);
@@ -400,7 +398,7 @@ public final class RadiacjaAleJAVA extends JavaPlugin implements Listener {
     }
 
     public void openInventory(Player p, String menu, String execute) {
-        String title = menu.substring(0, 6) + " " + menu.substring(6, menu.length());
+        String title = menu.substring(0, 6) + " " + menu.substring(6);
         Inventory inventory = Bukkit.createInventory(p, InventoryType.CHEST, title);
 
         switch (menu) {
@@ -475,25 +473,8 @@ public final class RadiacjaAleJAVA extends JavaPlugin implements Listener {
                 }
                 switch (p.getMetadata("ActionToExecute").getFirst().asString()) {
                     case "Info" -> {
-                        ItemStack book = new ItemStack(Material.WRITTEN_BOOK);
-                        BookMeta bMeta = (BookMeta) book.getItemMeta();
-                        bMeta.setTitle("Information about " + choosenPlayer.getName());
-                        Location loc = choosenPlayer.getLocation();
-                        String location = "Loc: " + loc.blockX() + " " + loc.blockY() + " " + loc.blockZ();
-                        Location resLoc = choosenPlayer.getRespawnLocation();
-                        String respawnLocation;
-                        if (resLoc != null) {
-                            respawnLocation = "Bed: " + resLoc.blockX() + " " + resLoc.blockY() + " " + resLoc.blockZ();
-                        } else {
-                            respawnLocation = "No respawn";
-
-                        }
-                        Location deathLoc = choosenPlayer.getLastDeathLocation();
-                        String deathLocation = "Death: " + deathLoc.blockX() + " " + deathLoc.blockY() + " " + deathLoc.blockZ();
-
-                        bMeta.addPage(location + "\n" + respawnLocation + "\n" + deathLocation);
-                        book.setItemMeta(bMeta);
-                        p.setItemInHand(book);
+                        ItemStack book = getItemStack(choosenPlayer);
+                        p.setItemOnCursor(book);
                         p.closeInventory();
                     }
                     case "Gamemode" -> {
@@ -532,6 +513,28 @@ public final class RadiacjaAleJAVA extends JavaPlugin implements Listener {
             }
             p.closeInventory();
         }
+    }
+
+    private static @NonNull ItemStack getItemStack(Player choosenPlayer) {
+        ItemStack book = new ItemStack(Material.WRITTEN_BOOK);
+        BookMeta bMeta = (BookMeta) book.getItemMeta();
+        bMeta.setTitle("Information about " + choosenPlayer.getName());
+        Location loc = choosenPlayer.getLocation();
+        String location = "Loc: " + loc.getBlockX() + " " + loc.getBlockY() + " " + loc.getBlockZ();
+        Location resLoc = choosenPlayer.getRespawnLocation();
+        String respawnLocation;
+        if (resLoc != null) {
+            respawnLocation = "Bed: " + resLoc.getBlockX() + " " + resLoc.getBlockY() + " " + resLoc.getBlockZ();
+        } else {
+            respawnLocation = "No respawn";
+
+        }
+        Location deathLoc = choosenPlayer.getLastDeathLocation();
+        String deathLocation = "Death: " + deathLoc.getBlockX() + " " + deathLoc.getBlockY() + " " + deathLoc.getBlockZ();
+
+        bMeta.addPage(location + "\n" + respawnLocation + "\n" + deathLocation);
+        book.setItemMeta(bMeta);
+        return book;
     }
 
     @EventHandler
