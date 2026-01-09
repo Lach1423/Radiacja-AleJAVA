@@ -16,11 +16,11 @@ import java.util.List;
 public class Renderer {
     Player player;
     World world;
-    int radius;
+    int radiusOffsetX;
+    int radiusOffsetZ;
     int playerX;
     int playerY;
     int playerZ;
-    int radiusChunk;
     private static final List<Set<Point>> circles = new ArrayList<>();
     static {
         for (int i = 0; i < 91; i++) {
@@ -33,22 +33,22 @@ public class Renderer {
         PARALLEL        // moving horizontally along the wall
     }
 
-    public Renderer(Player player, int radius) {
+    public Renderer(Player player, int radiusX, int radiusZ) {
         this.player = player;
         this.world = player.getWorld();
-        this.radius = radius;
+        this.radiusOffsetX = radiusX;
+        this.radiusOffsetZ = radiusZ;
         Location playerLocation = player.getLocation();
         this.playerX = playerLocation.getBlockX();
         this.playerY = playerLocation.getBlockY();
         this.playerZ = playerLocation.getBlockZ();
-        this.radiusChunk = Math.floorDiv(radius, 16);
     }
 
     public void renderCircleXWall(MovementDirection direction ,int radius, boolean renderHole) {
         List<BlockState> blocks = new ArrayList<>();
         Set<Point> circle = null, donut = null, hole = null;
 
-        int z = (int) (this.radius * Math.signum(playerZ));
+        int z = (int) (radiusOffsetX * Math.signum(playerZ));
         int baseY = playerY + 1; // head height
 
         switch (direction) {
@@ -61,10 +61,10 @@ public class Renderer {
         }
 
         if (renderHole) {
-            hole = getDonut(0, radius - 80);
+            hole = getDonut(0, radius - 8);
             for (Point point : hole) {
                 int x = playerX + point.x;
-                if (this.radius < Math.abs(x)) continue;
+                if (radiusOffsetX < Math.abs(x)) continue;
                 int y = baseY + point.y;
                 Block block = world.getBlockAt(x, y, z);
                 blocks.add(block.getState());
@@ -74,7 +74,7 @@ public class Renderer {
         if (donut != null) {
             for (Point point : donut) {
                 int x = playerX + point.x;
-                if (this.radius < Math.abs(x)) continue;
+                if (radiusOffsetX < Math.abs(x)) continue;
                 int y = baseY + point.y;
                 Block block = world.getBlockAt(x, y, z);
                 blocks.add(block.getState());
@@ -85,7 +85,7 @@ public class Renderer {
             if (hole != null) circle.removeAll(hole);
             for (Point point : circle) {
                 int x = playerX + point.x;
-                if (this.radius < Math.abs(x)) continue;
+                if (radiusOffsetX < Math.abs(x)) continue;
                 int y = baseY + point.y;
                 Block block = world.getBlockAt(x, y, z);
                 Material type = block.getType();
@@ -96,7 +96,7 @@ public class Renderer {
                 }
             }
         }
-
+        //player.sendMessage("Wysylam blocki");
         player.sendBlockChanges(blocks);
     }
 
@@ -104,7 +104,7 @@ public class Renderer {
         List<BlockState> blocks = new ArrayList<>();
         Set<Point> circle = null, donut = null, hole = null;
 
-        int x = (int) (this.radius * Math.signum(playerX));
+        int x = (int) (radiusOffsetZ * Math.signum(playerX));
         int baseY = playerY + 1; // head height
 
         switch (direction) {
@@ -117,11 +117,11 @@ public class Renderer {
         }
 
         if (renderHole) {
-            hole = getDonut(0, radius - 80);
+            hole = getDonut(0, radius - 8);
             for (Point point : hole) {
                 int y = baseY + point.y;
                 int z = playerZ + point.x;
-                if (this.radius < Math.abs(z)) continue;
+                if (radiusOffsetZ < Math.abs(z)) continue;
                 Block block = world.getBlockAt(x, y, z);
                 blocks.add(block.getState());
             }
@@ -131,7 +131,7 @@ public class Renderer {
             for (Point point : donut) {
                 int y = baseY + point.y;
                 int z = playerZ + point.x;
-                if (this.radius < Math.abs(z)) continue;
+                if (radiusOffsetZ < Math.abs(z)) continue;
                 BlockState state = world.getBlockAt(x, y, z).getState();
                 blocks.add(state);
             }
@@ -142,7 +142,7 @@ public class Renderer {
             for (Point point : circle) {
                 int y = baseY + point.y;
                 int z = playerZ + point.x;
-                if (this.radius < Math.abs(z)) continue;
+                if (radiusOffsetZ < Math.abs(z)) continue;
                 Block block = world.getBlockAt(x, y, z);
                 Material type = block.getType();
                 if (type == Material.AIR || type == Material.WATER) {
@@ -175,13 +175,13 @@ public class Renderer {
                 for (int[] point : hole) {
                     double x = playerX + point[0];
                     double y = playerY + point[1];
-                    double z = this.radius * Math.signum(playerZ);
+                    double z = radiusOffsetX * Math.signum(playerZ);
                     sendBlock(player, x, y, z);
                 }
             }
             case Z -> {
                 for (int[] point : hole) {
-                    double x = this.radius * Math.signum(playerX);
+                    double x = radiusOffsetZ * Math.signum(playerX);
                     double y = playerY + point[1];
                     double z = playerZ + point[0];
                     sendBlock(player, x, y, z);
