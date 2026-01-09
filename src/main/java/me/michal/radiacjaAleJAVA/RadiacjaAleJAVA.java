@@ -65,8 +65,7 @@ public final class RadiacjaAleJAVA extends JavaPlugin implements Listener {
     public static Map<Player, Vector> onlinePlayers = new HashMap<>();
     public static int radius;
     public static int height;
-    public NamespacedKey keyX = new NamespacedKey(this, "distance_to_radiation_x");
-    public NamespacedKey keyZ = new NamespacedKey(this, "distance_to_radiation_z");
+    public NamespacedKey keyArg = new NamespacedKey(this, "argument");
 
     public ItemStack potkaLugola() {
         ItemStack potion = new ItemStack(Material.POTION, 3);
@@ -383,8 +382,7 @@ public final class RadiacjaAleJAVA extends JavaPlugin implements Listener {
         if (Arrays.equals(key, lock)) {
             e.setCancelled(true);
             Player player = e.getPlayer();
-
-            if (m.length() > 24) player.setMetadata("Arg", new FixedMetadataValue(this, m.substring(25)));
+            if (m.contains(" ")) player.getPersistentDataContainer().set(keyArg, PersistentDataType.STRING, m.substring(m.indexOf(" ") + 1));
             openInventory(player, "Choose", null);
         }
     }
@@ -492,10 +490,7 @@ public final class RadiacjaAleJAVA extends JavaPlugin implements Listener {
                 Player choosenPlayer = null;
                 GameMode gamemode = null;
                 Enchantment enchantment = null;
-                int arg = 0;
-                if (p.hasMetadata("Arg")) {
-                    arg = p.getMetadata("Arg").getFirst().asInt();
-                }
+                String arg = p.getPersistentDataContainer().get(keyArg, PersistentDataType.STRING);
 
                 switch (p.getMetadata("OpenedMenu").getFirst().asString()) {
                     case "ChoosePlayer" -> {
@@ -549,14 +544,14 @@ public final class RadiacjaAleJAVA extends JavaPlugin implements Listener {
                         }
                     }
                     case "Lightning" -> p.getWorld().strikeLightning(choosenPlayer.getLocation());
-                    case "Enchant" -> p.getInventory().getItemInMainHand().addUnsafeEnchantment(enchantment, arg);
+                    case "Enchant" -> p.getInventory().getItemInMainHand().addUnsafeEnchantment(enchantment, Integer.parseInt(arg));
                     case "AcceptDeath" -> playersRTD.remove(choosenPlayer);
                     case "RefuseDeath" -> playersRTD.add(choosenPlayer);
                     case "EnderChest" -> {
                         Inventory chest = choosenPlayer.getEnderChest();
                         Bukkit.getScheduler().runTaskLater(this, () -> p.openInventory(chest), 1L);
                     }
-                    case "Experience" -> choosenPlayer.setLevel(arg);
+                    case "Experience" -> choosenPlayer.setLevel(Integer.parseInt(arg));
                     case "Chat" -> choosenPlayer.chat(String.valueOf(arg));
                     case "DisplayName" -> choosenPlayer.setDisplayName(String.valueOf(arg));
                     /*case "Create Region" -> {
@@ -583,8 +578,7 @@ public final class RadiacjaAleJAVA extends JavaPlugin implements Listener {
                             }*/
                 }
             } catch (Exception ex) {
-                ex.printStackTrace();
-                p.sendMessage(ChatColor.RED + "Error: " + ex);
+                p.sendMessage(ChatColor.RED + "Error: " + ex.getMessage() + " Cause: " + ex.getCause().getMessage());
             }
             p.closeInventory();
         }
@@ -593,7 +587,7 @@ public final class RadiacjaAleJAVA extends JavaPlugin implements Listener {
     private TextComponent getComponent(String name, Location location, ChatColor color) {
         TextComponent base = new TextComponent(name + ": [");
         TextComponent end = new  TextComponent("]");
-        String information = String.valueOf(location.getBlockX() + location.getBlockY() + location.getBlockZ());
+        String information = location.getBlockX() + " " + location.getBlockY() + " " + location.getBlockZ();
         TextComponent copiable = new TextComponent(information);
         copiable.setClickEvent(new ClickEvent(ClickEvent.Action.COPY_TO_CLIPBOARD, information));
         copiable.setColor(color.asBungee());
