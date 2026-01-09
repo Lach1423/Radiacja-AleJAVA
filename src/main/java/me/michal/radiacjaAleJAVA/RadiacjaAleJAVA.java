@@ -7,17 +7,16 @@ import com.sk89q.worldguard.protection.flags.Flags;
 import com.sk89q.worldguard.protection.flags.StateFlag;
 import com.sk89q.worldguard.protection.managers.RegionManager;
 import com.sk89q.worldguard.protection.regions.ProtectedCuboidRegion;
+import com.sk89q.worldguard.protection.regions.ProtectedRegion;
 import me.michal.radiacjaAleJAVA.Tasks.CuredPlayersTracker;
 import me.michal.radiacjaAleJAVA.Tasks.Renderer;
 import me.michal.radiacjaAleJAVA.Tasks.DamageInflicter;
 import me.michal.radiacjaAleJAVA.Tasks.Things.Encoder;
 import me.michal.radiacjaAleJAVA.Tasks.Things.Updater;
-import net.md_5.bungee.api.chat.BaseComponent;
 import net.md_5.bungee.api.chat.ClickEvent;
 import net.md_5.bungee.api.chat.TextComponent;
 import org.bukkit.*;
 import org.bukkit.Color;
-import org.bukkit.block.Block;
 import org.bukkit.boss.BarColor;
 import org.bukkit.boss.BarStyle;
 import org.bukkit.boss.BossBar;
@@ -50,7 +49,6 @@ import org.bukkit.potion.PotionType;
 import org.bukkit.profile.PlayerProfile;
 import org.bukkit.scheduler.BukkitTask;
 import org.bukkit.util.Vector;
-import org.jspecify.annotations.NonNull;
 
 import java.util.*;
 
@@ -67,6 +65,8 @@ public final class RadiacjaAleJAVA extends JavaPlugin implements Listener {
     public static Map<Player, Vector> onlinePlayers = new HashMap<>();
     public static int radius;
     public static int height;
+    public NamespacedKey keyX = new NamespacedKey(this, "distance_to_radiation_x");
+    public NamespacedKey keyZ = new NamespacedKey(this, "distance_to_radiation_z");
 
     public ItemStack potkaLugola() {
         ItemStack potion = new ItemStack(Material.POTION, 3);
@@ -235,8 +235,12 @@ public final class RadiacjaAleJAVA extends JavaPlugin implements Listener {
     public void moveEvent(PlayerMoveEvent e) {
         Player p = e.getPlayer();
         enterRegion(p);
+
+        if (getApplicableRegions(p).isEmpty()) return;
         if (e.getTo().getBlockX() == e.getFrom().getBlockX() && e.getTo().getBlockY() == e.getFrom().getBlockY() && e.getTo().getBlockZ() == e.getFrom().getBlockZ()) return;
-        nearRadiation(p, e.getTo().getBlock(), e.getFrom().getBlock());
+
+        approachRadiation(p, e.getFrom(), e.getTo());
+
     }
 
     public void enterRegion(Player player) {
@@ -255,48 +259,56 @@ public final class RadiacjaAleJAVA extends JavaPlugin implements Listener {
         }
     }
 
-    public void nearRadiation(Player player, Block newBlock, Block oldBlock) {
+    private Set<ProtectedRegion> getApplicableRegions(Player player) {
+        RegionManager regions = WorldGuard.getInstance().getPlatform().getRegionContainer().get(BukkitAdapter.adapt(player.getWorld()));
+        BlockVector3 pos = BukkitAdapter.asBlockVector(player.getLocation());
+        return regions.getApplicableRegions(pos).getRegions();
+    }
+
+    private void approachRadiation(Player p, Location oldLocation ,Location playerLocation) {
         int radius = config.getInt("Radiation_Safe_Zone_Size") + 1;
-        Location location = player.getLocation();
-        int playerDistanceToXWall = (int) Math.abs(radius - Math.abs(location.getZ()));
-        int playerDistanceToZWall = (int) Math.abs(radius - Math.abs(location.getX()));
-        int playerViewDistance = Math.min(player.getClientViewDistance(), player.getWorld().getViewDistance());
-        boolean skip = false;
+        Location spawnpoint = playerLocation.getWorld().getSpawnLocation();
 
-        Renderer renderer = new Renderer(player, radius, playerViewDistance);
+        int distanceToRadiationX = getDistanceToRadiation(playerLocation, spawnpoint, radius, Axis.X);
+        int distanceToRadiationZ = getDistanceToRadiation(playerLocation, spawnpoint, radius, Axis.Z);
 
-        if  (curedPlayers.containsKey(player)) {
-            if (playerDistanceToXWall <= 9) {
-                renderer.renderHole(Axis.X, 9 - playerDistanceToXWall);// 9 - 8 = 1r , 9 - 1 = 8r
-                skip = true;
-            }
-            if (playerDistanceToZWall <= 9) {
-                renderer.renderHole(Axis.Z, 9 - playerDistanceToZWall);
-                skip = true;
-            }
-        }
+        if (distanceToRadiationX > 15 && distanceToRadiationZ > 15) return;
+        Renderer renderer = new Renderer(p, playerLocation, config);
         Renderer.MovementDirection direction;
-        if (playerDistanceToXWall <= 90) {
-            direction = getDirection(Math.abs(oldBlock.getZ()), Math.abs(newBlock.getZ()));
-            renderer.renderCircleXWall(direction, 90 - playerDistanceToXWall, skip);
+
+        if (distanceToRadiationX <= 15) {
+            int oldDistance = getDistanceToRadiation(oldLocation, spawnpoint, radius, Axis.X);
+            direction = getDirection(oldDistance,  distanceToRadiationX);
+
+            renderer.renderRadiation(direction, spawnpoint, distanceToRadiationX, Axis.X);
         }
-        if (playerDistanceToZWall <= 90) {
-            direction = getDirection(Math.abs(oldBlock.getX()), Math.abs(newBlock.getX()));
-            renderer.renderCircleZWall(direction, 90 - playerDistanceToZWall, skip);
+        if (distanceToRadiationZ <= 15) {
+            int oldDistance = getDistanceToRadiation(oldLocation, spawnpoint, radius, Axis.Z);
+            direction = getDirection(oldDistance,  distanceToRadiationZ);
+
+            renderer.renderRadiation(direction, spawnpoint, distanceToRadiationZ, Axis.Z);
         }
     }
 
-    private Renderer.MovementDirection getDirection(int oldCoord, int newCoord) {
-        if (newCoord > oldCoord) return Renderer.MovementDirection.APPROACHING;
-        if (newCoord < oldCoord) return Renderer.MovementDirection.RECEDING;
+    private int getDistanceToRadiation(Location location, Location spawnpoint, int radius, Axis axis) {
+        int real = switch (axis) {
+            case X -> Math.abs(location.getBlockZ()) - Math.abs(spawnpoint.getBlockZ());
+            case Y -> 0;
+            case Z -> Math.abs(location.getBlockX()) - Math.abs(spawnpoint.getBlockX());
+        };
+        return Math.min(Math.abs(real - (-radius)), Math.abs(real - radius));
+    }
+
+    private Renderer.MovementDirection getDirection(int oldDistance, int newDistance) {
+        if (newDistance < oldDistance) return Renderer.MovementDirection.APPROACHING;
+        if (newDistance > oldDistance) return Renderer.MovementDirection.RECEDING;
         return Renderer.MovementDirection.PARALLEL;
     }
 
     @EventHandler
     public void joinEvent(PlayerJoinEvent e) {
         Player p = e.getPlayer();
-
-        nearRadiation(p, e.getPlayer().getLocation().getBlock(), e.getPlayer().getLocation().getBlock());
+        approachRadiation(p, p.getLocation(), p.getLocation());
 
         UUID uuid = p.getUniqueId();
         if (offlinePlayers.containsKey(uuid)) {
@@ -627,7 +639,7 @@ public final class RadiacjaAleJAVA extends JavaPlugin implements Listener {
                             if (args.length == 2) {
                                 height = Integer.parseInt(args[1]);
                             } else {
-                                height = 300;
+                                height = 320;
                             }
 
                             if (getSafeZone((Player) sender, "rad", radius, height)) {
@@ -707,8 +719,9 @@ public final class RadiacjaAleJAVA extends JavaPlugin implements Listener {
     }
 
     public boolean getSafeZone(Player p, String regionName, int radius, int height) {
-        BlockVector3 min = BlockVector3.at(-radius, -64, -radius);
-        BlockVector3 max = BlockVector3.at(radius, height, radius);
+        Location loc = p.getLocation();
+        BlockVector3 min = BlockVector3.at(loc.getBlockX() - radius, -64, loc.getBlockZ() - radius);
+        BlockVector3 max = BlockVector3.at(loc.getBlockX() + radius, height, loc.getBlockZ() + radius);
 
         return createRegion(p, regionName, min, max);
     }
