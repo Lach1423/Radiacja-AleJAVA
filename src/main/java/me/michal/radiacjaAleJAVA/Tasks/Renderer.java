@@ -7,6 +7,8 @@ import org.bukkit.Material;
 import org.bukkit.World;
 import org.bukkit.block.Block;
 import org.bukkit.block.BlockState;
+import org.bukkit.configuration.ConfigurationSection;
+import org.bukkit.configuration.file.FileConfiguration;
 import org.bukkit.entity.Player;
 
 import java.awt.*;
@@ -36,12 +38,14 @@ public class Renderer {
             Material.SEAGRASS,
             Material.TALL_SEAGRASS
     );
+    FileConfiguration config;
 
-    public Renderer(Player player, Location playerLocation) {
+    public Renderer(Player player, Location playerLocation, FileConfiguration config) {
         this.player = player;
         this.playerX = playerLocation.getBlockX();
         this.playerY = playerLocation.getBlockY() + 1;
         this.playerZ = playerLocation.getBlockZ();
+        this.config = config;
     }
 
     public void renderRadiation(MovementDirection direction, Location spawnpoint, int distance, Axis axis) {
@@ -54,8 +58,6 @@ public class Renderer {
             case PARALLEL    : pointsToRender = circles.get(r); pointsToDeRender = getDonut(r + 1, r + 4); break;
         }
 
-        ///pointsToRender.removeAll(pointsToDeRender);
-
         int isNearEastRadiation = switch (axis) {
             case Axis.X -> player.getLocation().getBlockZ() > spawnpoint.getBlockZ() ? 1 : -1;
             case Axis.Z -> player.getLocation().getBlockX() > spawnpoint.getBlockX() ? 1 : -1;
@@ -64,35 +66,50 @@ public class Renderer {
 
         List<BlockState> blocks = new ArrayList<>();
         if (!pointsToRender.isEmpty()) {
-            Set<Vector3> blocksToRender = calculateBlocks(distance, pointsToRender, isNearEastRadiation, axis, spawnpoint, r);
+            Set<Vector3> blocksToRender = calculateBlocks(distance, pointsToRender, isNearEastRadiation, axis, spawnpoint);
             blocks.addAll(getBlockStates(blocksToRender, true));
         }
 
         if (!pointsToDeRender.isEmpty()) {
-            Set<Vector3> blocksToDeRender = calculateBlocks(distance, pointsToDeRender, isNearEastRadiation, axis, spawnpoint, r);
+            if (direction == MovementDirection.RECEDING && distance == 15) {
+                pointsToDeRender.add( new Point(-1, 0));
+                pointsToDeRender.add( new Point(1, 0));
+                pointsToDeRender.add( new Point(0, 1));
+                pointsToDeRender.add( new Point(0, -1));
+                pointsToDeRender.add( new Point(0, 0));
+            }
+            Set<Vector3> blocksToDeRender = calculateBlocks(distance, pointsToDeRender, isNearEastRadiation, axis, spawnpoint);
             blocks.addAll(getBlockStates(blocksToDeRender, false));
         }
         player.sendBlockChanges(blocks);
     }
 
-    private Set<Vector3> calculateBlocks(int distance, Set<Point> pointsToCalculate, int isNearNorthEastRadiation, Axis axis, Location spawnpoint, int r) {
+    private Set<Vector3> calculateBlocks(int distance, Set<Point> pointsToCalculate, int isNearNorthEastRadiation, Axis axis, Location spawnpoint) {
         Set<Vector3> calculatedBlocks = new HashSet<>();
+        int r = config.getInt("Radiation_Safe_Zone_Size");
+        int minBorder;
+        int maxBorder;
         switch (axis) {
-            case Axis.X : for (Point point : pointsToCalculate) {
+            case Axis.X :
+                minBorder = spawnpoint.getBlockX() - r;
+                maxBorder = spawnpoint.getBlockX() + r;
+                for (Point point : pointsToCalculate) {
                 int x = playerX + point.x;
-                //if (x < spawnpoint.getBlockX() - r || spawnpoint.getBlockX() + r < x) continue;
+                if (x < minBorder || maxBorder < x) continue;
                 int y = playerY + point.y;
                 if (y < -64 || 320 < y) continue;
-                int z = playerZ + (distance * isNearNorthEastRadiation);
+                int z = playerZ + ((distance - 1) * isNearNorthEastRadiation);
                 calculatedBlocks.add(new Vector3(x, y, z));
             }
             break;
             case Axis.Z : for (Point point : pointsToCalculate) {
-                int x = playerX + (distance * isNearNorthEastRadiation);
-                //if (x < spawnpoint.getBlockZ() - r || spawnpoint.getBlockZ() + r < x) continue;
+                minBorder = spawnpoint.getBlockZ() - r;
+                maxBorder = spawnpoint.getBlockZ() + r;
+                int x = playerX + ((distance - 1) * isNearNorthEastRadiation);
                 int y = playerY + point.y;
                 if (y < -64 || 320 < y) continue;
                 int z = playerZ + point.x;
+                if (z < minBorder || maxBorder < z) continue;
                 calculatedBlocks.add(new Vector3(x, y, z));
             }
             break;
