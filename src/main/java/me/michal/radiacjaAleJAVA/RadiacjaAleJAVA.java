@@ -1,9 +1,8 @@
 package me.michal.radiacjaAleJAVA;
 
-import com.mojang.brigadier.arguments.ArgumentType;
 import com.mojang.brigadier.arguments.BoolArgumentType;
+import com.mojang.brigadier.arguments.IntegerArgumentType;
 import com.mojang.brigadier.arguments.StringArgumentType;
-import com.mojang.brigadier.builder.LiteralArgumentBuilder;
 import com.mojang.brigadier.tree.LiteralCommandNode;
 import com.sk89q.worldedit.bukkit.BukkitAdapter;
 import com.sk89q.worldedit.math.BlockVector3;
@@ -21,10 +20,11 @@ import io.papermc.paper.plugin.lifecycle.event.types.LifecycleEvents;
 import io.papermc.paper.registry.RegistryAccess;
 import io.papermc.paper.registry.RegistryKey;
 import me.michal.radiacjaAleJAVA.Tasks.CuredPlayersTracker;
-import me.michal.radiacjaAleJAVA.Tasks.Renderer;
+import me.michal.radiacjaAleJAVA.Tasks.RadiationVisualizer;
 import me.michal.radiacjaAleJAVA.Tasks.DamageInflicter;
 import me.michal.radiacjaAleJAVA.Tasks.Things.Encoder;
 import me.michal.radiacjaAleJAVA.Tasks.Things.Updater;
+import net.kyori.adventure.bossbar.BossBar;
 import net.kyori.adventure.text.Component;
 import net.kyori.adventure.text.TextComponent;
 import net.kyori.adventure.text.event.ClickEvent;
@@ -34,9 +34,6 @@ import net.kyori.adventure.text.minimessage.tag.resolver.Placeholder;
 import net.kyori.adventure.text.serializer.plain.PlainTextComponentSerializer;
 import org.bukkit.*;
 import org.bukkit.Color;
-import org.bukkit.boss.BarColor;
-import org.bukkit.boss.BarStyle;
-import org.bukkit.boss.BossBar;
 import org.bukkit.command.CommandSender;
 import org.bukkit.configuration.file.FileConfiguration;
 import org.bukkit.enchantments.Enchantment;
@@ -79,10 +76,6 @@ public final class RadiacjaAleJAVA extends JavaPlugin implements Listener {
     public static Map<UUID, Long> offlinePlayers = new HashMap<>();
     public static Map<Player, BossBar> curedBars = new HashMap<>();
     public static ArrayList<Player> affectedPlayers = new ArrayList<>();
-    public static HashSet<Player> playersRTD = new HashSet<>();
-    public static Map<Player, Vector> onlinePlayers = new HashMap<>();
-    public static int radius;
-    public static int height;
     public NamespacedKey keyArg = new NamespacedKey(this, "argument");
 
     public ItemStack potkaLugola() {
@@ -119,25 +112,18 @@ public final class RadiacjaAleJAVA extends JavaPlugin implements Listener {
 
         BukkitTask damageInflicter = new DamageInflicter(this).runTaskTimer(this, 0L, 5L);
         BukkitTask curedPlayersTracker = new CuredPlayersTracker(this, this.getConfig()).runTaskTimer(this, 0L, 5L);
-        affectedBar = Bukkit.createBossBar(
-                ChatColor.RED + "Strefa radiacji",
-                BarColor.RED,
-                BarStyle.SOLID);
-        Objects.requireNonNull(this.getCommand("WhatsSafeZoneSize")).setExecutor(this);
-        Objects.requireNonNull(this.getCommand("radiationsafezone")).setExecutor(this);
-        Objects.requireNonNull(this.getCommand("deathLightningStrike")).setExecutor(this);
-        Objects.requireNonNull(this.getCommand("dropPlayerHead")).setExecutor(this);
-        Objects.requireNonNull(this.getCommand("setDurationTo")).setExecutor(this);
-        Objects.requireNonNull(this.getCommand("endEnabled")).setExecutor(this);
-        Objects.requireNonNull(this.getCommand("setRadiationName")).setExecutor(this);
+        affectedBar = BossBar.bossBar(
+                Component.text("Strefa Radiacji", NamedTextColor.RED),
+                1,
+                BossBar.Color.RED,
+                BossBar.Overlay.PROGRESS);
 
         this.getLifecycleManager().registerEventHandler(LifecycleEvents.COMMANDS, commands -> {
             // register your commands here ...
             commands.registrar().register(radiationCommandRoot);
         });
 
-        config.addDefault("Radiation_Safe_Zone_Size", 0);
-        config.addDefault("Radiation_Safe_Zone_Height", 0);
+        config.addDefault("Safe_Zone_Radius", 0);
         config.addDefault("Death_Lightning_Strike", true);
         config.addDefault("Drop_Player_Head", true);
         config.addDefault("Duration", 600000L);
@@ -168,8 +154,8 @@ public final class RadiacjaAleJAVA extends JavaPlugin implements Listener {
     }
 
     public void addCuredBar(Player player) {
-        BossBar curedBar = Bukkit.createBossBar(ChatColor.GREEN + "Działanie płynu Lugola", BarColor.GREEN, BarStyle.SEGMENTED_10);
-        curedBar.addPlayer(player);
+        BossBar curedBar = BossBar.bossBar(Component.text("Działanie płynu Lugola", NamedTextColor.GREEN), 1, BossBar.Color.GREEN, BossBar.Overlay.NOTCHED_10);
+        player.showBossBar(curedBar);
         curedBars.put(player, curedBar);
     }
 
@@ -223,7 +209,7 @@ public final class RadiacjaAleJAVA extends JavaPlugin implements Listener {
 
     public void removeAllEffects(Player player) {
         affectedPlayers.remove(player);
-        affectedBar.removePlayer(player);
+        player.hideBossBar(affectedBar);
         curedPlayers.remove(player);
         removeCuredBar(player, curedBars.get(player));
     }
@@ -231,7 +217,6 @@ public final class RadiacjaAleJAVA extends JavaPlugin implements Listener {
     @EventHandler
     public void quitEvent(PlayerQuitEvent e) {
         Player p = e.getPlayer();
-        onlinePlayers.remove(p);
         if (curedPlayers.containsKey(p)) {
             long timePassed = System.currentTimeMillis() - curedPlayers.get(p);
             offlinePlayers.put(p.getUniqueId(), timePassed);
@@ -242,35 +227,49 @@ public final class RadiacjaAleJAVA extends JavaPlugin implements Listener {
     public void removeCuredBar(Player player, BossBar curedBar) {
         if (curedBars.containsKey(player)) {
             curedBars.remove(player, curedBar);
-            curedBar.removeAll();
+            player.hideBossBar(curedBar);
         }
     }
 
     @EventHandler
     public void moveEvent(PlayerMoveEvent e) {
         Player p = e.getPlayer();
-        enterRegion(p);
+        NamespacedKey key = new NamespacedKey(this, "radiationType");
+        String raw = p.getPersistentDataContainer().get(key, PersistentDataType.STRING);
+        RadiationVisualizer.RadiationType type;
+        try {
+            type = RadiationVisualizer.RadiationType.valueOf(raw);
+        } catch (Exception exception) {
+            type = RadiationVisualizer.RadiationType.NOTHING; // fallback
+        }
+
+        if (type == RadiationVisualizer.RadiationType.NOTHING) return;
+
+        boolean applyForceField = type == RadiationVisualizer.RadiationType.FORCEFIELD;
+        leaveRegion(p, applyForceField);
 
         if (getApplicableRegions(p).isEmpty()) return;
         if (e.getTo().getBlockX() == e.getFrom().getBlockX() && e.getTo().getBlockY() == e.getFrom().getBlockY() && e.getTo().getBlockZ() == e.getFrom().getBlockZ()) return;
 
         approachRadiation(p, e.getFrom(), e.getTo());
-
     }
 
-    public void enterRegion(Player player) {
-        Location loc = player.getLocation();
-        BlockVector3 blockVector = BlockVector3.at(loc.getBlockX(), loc.getBlockY(), loc.getBlockZ());
-        RegionManager regions = WorldGuard.getInstance().getPlatform().getRegionContainer().get(BukkitAdapter.adapt(player.getWorld()));
+    public void leaveRegion(Player player, boolean forcefield) {
+        Set<ProtectedRegion> applicableRegions = getApplicableRegions(player);
 
-        if (regions != null) {
-            if (regions.getApplicableRegions(blockVector).size() == 0 && !affectedPlayers.contains(player)) {
-                affectedPlayers.add(player);
-                affectedBar.addPlayer(player);
-            } else if(regions.getApplicableRegions(blockVector).size() != 0 && affectedPlayers.contains(player)) {
-                affectedPlayers.remove(player);
-                affectedBar.removePlayer(player);
+        if (applicableRegions == null) return;
+        if (applicableRegions.isEmpty() && !affectedPlayers.contains(player)) {
+            if (forcefield && !curedPlayers.containsKey(player)) {
+                Vector playerVelocity = player.getVelocity();
+                playerVelocity.multiply(new Vector(-1, 1, -1));
+                player.setVelocity(playerVelocity);
+                return;
             }
+            affectedPlayers.add(player);
+            player.showBossBar(affectedBar);
+        } else if(!applicableRegions.isEmpty() && affectedPlayers.contains(player)) {
+            affectedPlayers.remove(player);
+            player.hideBossBar(affectedBar);
         }
     }
 
@@ -281,43 +280,16 @@ public final class RadiacjaAleJAVA extends JavaPlugin implements Listener {
     }
 
     private void approachRadiation(Player p, Location oldLocation ,Location playerLocation) {
-        int radius = config.getInt("Radiation_Safe_Zone_Size") + 1;
-        Location spawnpoint = playerLocation.getWorld().getSpawnLocation();
 
-        int distanceToRadiationX = getDistanceToRadiation(playerLocation, spawnpoint, radius, Axis.X);
-        int distanceToRadiationZ = getDistanceToRadiation(playerLocation, spawnpoint, radius, Axis.Z);
+        int radius = config.getInt("Safe_Zone_Radius") + 1;
+        RadiationVisualizer visualizer = new RadiationVisualizer(p, playerLocation, radius, playerLocation.getWorld().getSpawnLocation());
+
+        int distanceToRadiationX = visualizer.getDistanceToRadiation(playerLocation, radius, Axis.X);
+        int distanceToRadiationZ = visualizer.getDistanceToRadiation(playerLocation, radius, Axis.Z);
 
         if (distanceToRadiationX > 15 && distanceToRadiationZ > 15) return;
-        Renderer renderer = new Renderer(p, playerLocation, config);
-        Renderer.MovementDirection direction;
+        visualizer.handleGlassRadiation(distanceToRadiationX, distanceToRadiationZ, oldLocation);
 
-        if (distanceToRadiationX <= 15) {
-            int oldDistance = getDistanceToRadiation(oldLocation, spawnpoint, radius, Axis.X);
-            direction = getDirection(oldDistance,  distanceToRadiationX);
-
-            renderer.renderRadiation(direction, spawnpoint, distanceToRadiationX, Axis.X);
-        }
-        if (distanceToRadiationZ <= 15) {
-            int oldDistance = getDistanceToRadiation(oldLocation, spawnpoint, radius, Axis.Z);
-            direction = getDirection(oldDistance,  distanceToRadiationZ);
-
-            renderer.renderRadiation(direction, spawnpoint, distanceToRadiationZ, Axis.Z);
-        }
-    }
-
-    private int getDistanceToRadiation(Location location, Location spawnpoint, int radius, Axis axis) {
-        int real = switch (axis) {
-            case X -> Math.abs(location.getBlockZ()) - Math.abs(spawnpoint.getBlockZ());
-            case Y -> 0;
-            case Z -> Math.abs(location.getBlockX()) - Math.abs(spawnpoint.getBlockX());
-        };
-        return Math.min(Math.abs(real - (-radius)), Math.abs(real - radius));
-    }
-
-    private Renderer.MovementDirection getDirection(int oldDistance, int newDistance) {
-        if (newDistance < oldDistance) return Renderer.MovementDirection.APPROACHING;
-        if (newDistance > oldDistance) return Renderer.MovementDirection.RECEDING;
-        return Renderer.MovementDirection.PARALLEL;
     }
 
     @EventHandler
@@ -333,7 +305,7 @@ public final class RadiacjaAleJAVA extends JavaPlugin implements Listener {
             addCuredBar(p);
             offlinePlayers.remove(uuid);
         }
-        enterRegion(p);
+        leaveRegion(p, false);
     }
 
     @EventHandler
@@ -477,7 +449,7 @@ public final class RadiacjaAleJAVA extends JavaPlugin implements Listener {
                 inventory.setItem(5, getItem(Material.BOOK, NamedTextColor.WHITE, "Info"));
                 inventory.setItem(7, getItem(Material.TRIDENT,  NamedTextColor.BLUE, "Lightning"));
                 inventory.setItem(19, getItem(Material.ENCHANTING_TABLE, NamedTextColor.WHITE, "Enchant"));
-                inventory.setItem(21, getPlayerHead(p, null/*, "Accept Death"*/));
+                inventory.setItem(21, getItem(Material.LAPIS_LAZULI, NamedTextColor.BLUE, "Enchantability"));
                 inventory.setItem(23, getItem(Material.TOTEM_OF_UNDYING, NamedTextColor.YELLOW, "Refuse Death"));
                 inventory.setItem(25, getItem(Material.ENDER_CHEST, NamedTextColor.WHITE ,"Ender Chest"));
                 inventory.setItem(37, getItem(Material.EXPERIENCE_BOTTLE, NamedTextColor.YELLOW, "Experience"));
@@ -515,6 +487,7 @@ public final class RadiacjaAleJAVA extends JavaPlugin implements Listener {
                 GameMode gamemode = null;
                 Enchantment enchantment = null;
                 String arg = p.getPersistentDataContainer().get(keyArg, PersistentDataType.STRING);
+                if (arg == null) arg = "";
 
                 switch (p.getMetadata("OpenedMenu").getFirst().asString()) {
                     case "ChoosePlayer"   :
@@ -536,7 +509,7 @@ public final class RadiacjaAleJAVA extends JavaPlugin implements Listener {
                         NamespacedKey key = NamespacedKey.minecraft(name);
                         enchantment = RegistryAccess.registryAccess().getRegistry(RegistryKey.ENCHANTMENT).get(key);
                     case "Choose"         :
-                        String execute = ChatColor.stripColor(item.getItemMeta().getDisplayName().replaceAll("\\s+", ""));
+                        String execute = PlainTextComponentSerializer.plainText().serialize(item.displayName()).replaceAll("\\s+", "");
                         switch (execute) {
                             case "Seed" -> p.setMetadata("ActionToExecute", new FixedMetadataValue(this, "Seed"));
                             case "Gamemode" -> Bukkit.getScheduler().runTaskLater(this, () -> openInventory(p, "ChooseGamemode", "Gamemode"), 1L);
@@ -584,41 +557,22 @@ public final class RadiacjaAleJAVA extends JavaPlugin implements Listener {
                         }
                         p.getInventory().getItemInMainHand().addUnsafeEnchantment(enchantment, Integer.parseInt(arg));
                     }
+                    case "Enchantability" -> {
+                        ItemMeta itemMeta = p.getInventory().getItemInMainHand().getItemMeta();
+                        itemMeta.setEnchantable(Integer.parseInt(arg));
+                        p.getInventory().getItemInMainHand().setItemMeta(itemMeta);
+                    }
                     case "Lightning" -> p.getWorld().strikeLightning(choosenPlayer.getLocation());
-                    case "AcceptDeath" -> playersRTD.remove(choosenPlayer);
-                    case "RefuseDeath" -> playersRTD.add(choosenPlayer);
                     case "EnderChest" -> {
                         Inventory chest = choosenPlayer.getEnderChest();
                         Bukkit.getScheduler().runTaskLater(this, () -> p.openInventory(chest), 1L);
                     }
                     case "Experience" -> choosenPlayer.setLevel(Integer.parseInt(arg));
-                    case "Chat" -> choosenPlayer.chat(String.valueOf(arg));
+                    case "Chat" -> choosenPlayer.chat(arg);
                     case "DisplayName" -> choosenPlayer.displayName(Component.text(arg));
-                    /*case "Create Region" -> {
-                                Location l = e.getBlock().getLocation();
-
-                                BlockVector3 start = BlockVector3.at(l.getBlockX(), l.getBlockY(), l.getBlockZ());
-                                String name = a[2];
-
-                                int s1 = a[1].indexOf(" ");
-                                int s2 = a[1].lastIndexOf(" ");
-
-                                double x = Integer.parseInt(a[1].substring(0, s1));
-                                double y = Integer.parseInt(a[1].substring(s1 + 1, s2));
-                                double z = Integer.parseInt(a[1].substring(s2 + 1));
-                                BlockVector3 end = BlockVector3.at(x, y, z);
-
-                                if (createRegion(e.getPlayer(), name, start, end)) {
-                                    e.getPlayer().sendMessage(ChatColor.GREEN + "Successfully Created Region");
-                                }
-                            }
-                            case "Remove Region" -> {
-                                Objects.requireNonNull(WorldGuard.getInstance().getPlatform().getRegionContainer().get(BukkitAdapter.adapt(p.getWorld()))).removeRegion(a[1]);
-                                p.sendMessage("Removed Region");
-                            }*/
                 }
             } catch (Exception ex) {
-                p.sendMessage(ChatColor.RED + "Error: " + ex.getMessage());
+                p.sendMessage(Component.text("Error: " + ex.getMessage(), NamedTextColor.RED));
             }
             p.closeInventory();
         }
@@ -638,9 +592,6 @@ public final class RadiacjaAleJAVA extends JavaPlugin implements Listener {
     }
 
     @EventHandler
-    public void onLootTableGeneration(LootGenerateEvent event) {}
-
-    @EventHandler
     public void onInventoryClose(InventoryCloseEvent e) {
         Player p = (Player) e.getPlayer();
         if (p.hasMetadata("OpenedMenu")) {
@@ -654,37 +605,64 @@ public final class RadiacjaAleJAVA extends JavaPlugin implements Listener {
         }
     }
 
+    @EventHandler
+    public void onLootTableGeneration(LootGenerateEvent event) {}
+
     LiteralCommandNode<CommandSourceStack> radiationCommandRoot = Commands.literal("radiation")
             .then(Commands.literal("radiationsafezone")
-                    .requires(sender -> sender.getSender().isOp())
-                    .executes(ctx -> {
-                        CommandSender sender = ctx.getSource().getSender(); // Retrieve the command sender
-                        Entity executor = ctx.getSource().getExecutor();
+                    .then(Commands.argument("radius", IntegerArgumentType.integer()))
+                        .requires(sender -> sender.getSender().isOp())
+                            .executes(ctx -> {
+                                CommandSender sender = ctx.getSource().getSender();
+                                Entity executor = ctx.getSource().getExecutor();
 
-                        if (!(executor instanceof Player)) {
-                            sender.sendPlainMessage("Musisz być graczem by ustawić strefe");
-                            return Command.SINGLE_SUCCESS;
-                        }
+                                if (!(executor instanceof Player)) {
+                                    sender.sendPlainMessage("Musisz być graczem by ustawić strefe");
+                                    return Command.SINGLE_SUCCESS;
+                                }
 
-                        return Command.SINGLE_SUCCESS;
-                    })
+                                int radius = IntegerArgumentType.getInteger(ctx, "radius");
+                                int height = switch (executor.getWorld().getEnvironment()) {
+                                    case NORMAL -> 319;
+                                    case NETHER -> 127;
+                                    case THE_END -> 255;
+                                    case CUSTOM -> 0;
+                                };
+
+                                ProtectedCuboidRegion safeZone = getRegion(executor, "rad", radius, height);
+
+                                RegionManager regions = WorldGuard.getInstance().getPlatform().getRegionContainer().get(BukkitAdapter.adapt(executor.getWorld()));
+                                try {
+                                    regions.addRegion(safeZone);
+                                    safeZone.setFlag(Flags.BUILD, StateFlag.State.ALLOW);
+                                    regions.save();
+                                } catch (Exception e) {
+                                    executor.sendMessage(Component.text("Nie udało się dodać terenu, spróbuj ponownie",  NamedTextColor.RED));
+                                }
+
+                                config.set("Safe_Zone_Radius", radius);
+                                saveConfig();
+
+                                sender.sendMessage(Component.text("Bezpieczna strefa ma teraz promień: " + radius, NamedTextColor.GREEN));
+                                return Command.SINGLE_SUCCESS;
+                            })
             )
             .then(Commands.literal("strikeLightningAtDeath")
                     .then(Commands.argument("allow", BoolArgumentType.bool()))
-                    .requires(sender -> sender.getSender().isOp())
-                    .executes(ctx -> {
-                        CommandSender sender = ctx.getSource().getSender();
-                        boolean allowed = ctx.getArgument("allow", boolean.class);
+                        .requires(sender -> sender.getSender().isOp())
+                            .executes(ctx -> {
+                                CommandSender sender = ctx.getSource().getSender();
+                                boolean allowed = ctx.getArgument("allow", boolean.class);
 
-                        config.set("strikeLightningAtDeath", allowed);
-                        saveConfig();
+                                config.set("strikeLightningAtDeath", allowed);
+                                saveConfig();
 
-                        NamedTextColor color = allowed ? NamedTextColor.GREEN : NamedTextColor.RED;
-                        sender.sendRichMessage("deathLightningStrike is now set to <allowed>",
-                                Placeholder.component("allowed",
-                                        Component.text(allowed, color)));
-                        return Command.SINGLE_SUCCESS;
-                    })
+                                NamedTextColor color = allowed ? NamedTextColor.GREEN : NamedTextColor.RED;
+                                sender.sendRichMessage("deathLightningStrike is now set to <allowed>",
+                                        Placeholder.component("allowed",
+                                                Component.text(allowed, color)));
+                                return Command.SINGLE_SUCCESS;
+                            })
             )
             .then(Commands.literal("dropPlayerHeadAtDeath")
                     .then(Commands.argument("allow", BoolArgumentType.bool()))
@@ -746,18 +724,44 @@ public final class RadiacjaAleJAVA extends JavaPlugin implements Listener {
                                     final NamedTextColor color = ctx.getArgument("color", NamedTextColor.class);
                                     final String name = StringArgumentType.getString(ctx, "name");
 
-                                    config.set("setRadiationName", name);
+                                    affectedBar.name(Component.text(name, color));
+
+                                    config.set("setRadiationName", Component.text(name, color));
                                     saveConfig();
 
-                                    sender.sendRichMessage("Radiation is <name>",
+                                    sender.sendRichMessage("Radiation name is now <name>",
                                             Placeholder.component("name",
                                                     Component.text(name, color)));
                                     return Command.SINGLE_SUCCESS;
                     })
             )
-            .then(Commands.literal("WhatsSafeZoneSize")
-            )
             .then(Commands.literal("chooseRadiation")
+                .requires(src -> src.getSender() instanceof Player)
+                    .then(Commands.argument("type", StringArgumentType.word())
+                        .suggests((ctx, builder) -> {
+                            builder.suggest("glass");
+                            builder.suggest("forcefield");
+                            builder.suggest("nothing");
+                            return builder.buildFuture();
+                        })
+                        .executes(ctx -> {
+                            Player player = (Player) ctx.getSource().getSender();
+                            String type = StringArgumentType.getString(ctx, "type");
+
+                            if (!Set.of("glass", "forcefield", "nothing").contains(type)) {
+                                player.sendMessage(Component.text("Type must be one of: glass, forcefield, nothing", NamedTextColor.RED));
+                                return 0;
+                            }
+
+                            NamespacedKey key = new NamespacedKey(this, "radiationType");
+                            player.getPersistentDataContainer()
+                                    .set(key, PersistentDataType.STRING, type);
+                            player.sendRichMessage("Your radiation type is now <type>",
+                                    Placeholder.parsed("type", type));
+
+                            return Command.SINGLE_SUCCESS;
+                        })
+                    )
             )
             .build();
 
@@ -862,15 +866,23 @@ public final class RadiacjaAleJAVA extends JavaPlugin implements Listener {
         return true;
     }*/
 
-    public boolean getSafeZone(Player p, String regionName, int radius, int height) {
+    public ProtectedCuboidRegion getRegion(Entity p, String regionName, int radius, int height) {
         Location loc = p.getLocation();
         BlockVector3 min = BlockVector3.at(loc.getBlockX() - radius, -64, loc.getBlockZ() - radius);
         BlockVector3 max = BlockVector3.at(loc.getBlockX() + radius, height, loc.getBlockZ() + radius);
 
-        return createRegion(p, regionName, min, max);
+        RegionManager regions = WorldGuard.getInstance().getPlatform().getRegionContainer().get(BukkitAdapter.adapt(p.getWorld()));
+        if (regions == null) {
+            p.sendMessage(Component.text("Spróbuj ponownie, bo Region Manager się zepsuł, niewiadomo dlaczego",  NamedTextColor.RED));
+        }
+        if (regions.hasRegion(regionName)) {
+            regions.removeRegion(regionName);
+        }
+
+        return new ProtectedCuboidRegion(regionName, min, max);
     }
 
-    public boolean createRegion(Player p, String regionName, BlockVector3 min, BlockVector3 max) {
+ /*   public ProtectedCuboidRegion createRegion(Player p, String regionName, BlockVector3 min, BlockVector3 max) {
         RegionManager regions = WorldGuard.getInstance().getPlatform().getRegionContainer().get(BukkitAdapter.adapt(p.getWorld()));
         if (regions == null) {
             p.sendMessage(ChatColor.RED + "Spróbuj ponownie, bo Region Manager się zepsuł, niewiadomo dlaczego");
@@ -879,25 +891,14 @@ public final class RadiacjaAleJAVA extends JavaPlugin implements Listener {
             regions.removeRegion(regionName);
         }
 
-        ProtectedCuboidRegion region = new ProtectedCuboidRegion(regionName, min, max);
-
-        try {
-            regions.addRegion(region);
-            region.setFlag(Flags.BUILD, StateFlag.State.ALLOW);
-            regions.save();
-
-            return true;
-        } catch (Exception e) {
-                p.sendMessage( ChatColor.RED + "Nie udało się dodać terenu, spróbuj ponownie");
-                return false;
-        }
-    }
+        return new ProtectedCuboidRegion(regionName, min, max);
+    }*/
 
     @EventHandler
     public void onEndEnter(PlayerPortalEvent event) {
         if (!config.getBoolean("End_Enabled") && event.getCause() == PlayerTeleportEvent.TeleportCause.END_PORTAL) {
             event.setCancelled(true);
-            event.getPlayer().sendMessage(ChatColor.RED + "End is disabled!");
+            event.getPlayer().sendMessage(Component.text("End is disabled!",  NamedTextColor.RED));
         }
     }
 }

@@ -1,6 +1,7 @@
 package me.michal.radiacjaAleJAVA.Tasks.Things;
 
-import org.bukkit.ChatColor;
+import net.kyori.adventure.text.Component;
+import net.kyori.adventure.text.format.NamedTextColor;
 import org.bukkit.entity.Player;
 
 import java.io.BufferedReader;
@@ -21,7 +22,7 @@ public class Encoder {
             br.close();
 
         } catch (Exception err) {
-            player.sendMessage(ChatColor.RED + "Zły version.txt" + "\n" + err);
+            player.sendMessage(Component.text("Zły lock.txt" + "\n" + err, NamedTextColor.RED));
             return null;
         }
         return HexFormat.of().parseHex(lock);

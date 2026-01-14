@@ -14,11 +14,13 @@ import java.awt.*;
 import java.util.*;
 import java.util.List;
 
-public class Renderer {
+public class RadiationVisualizer {
     Player player;
     int playerX;
     int playerY;
     int playerZ;
+    int radius;
+    Location spawnpoint;
     private static final List<Set<Point>> circles = new ArrayList<>();
     static {
         for (int i = 0; i < 20; i++) {
@@ -37,17 +39,55 @@ public class Renderer {
             Material.SEAGRASS,
             Material.TALL_SEAGRASS
     );
+    public enum RadiationType {
+        GLASS,
+        FORCEFIELD,
+        NOTHING
+    }
+
     FileConfiguration config;
 
-    public Renderer(Player player, Location playerLocation, FileConfiguration config) {
+    public RadiationVisualizer(Player player, Location playerLocation, int radius, Location spawnpoint) {
         this.player = player;
         this.playerX = playerLocation.getBlockX();
         this.playerY = playerLocation.getBlockY() + 1;
         this.playerZ = playerLocation.getBlockZ();
-        this.config = config;
+        this.radius = radius;
+        this.spawnpoint = spawnpoint;
     }
 
-    public void renderRadiation(MovementDirection direction, Location spawnpoint, int distance, Axis axis) {
+    public void handleGlassRadiation(int distanceToRadiationX, int distanceToRadiationZ, Location oldLocation) {
+        RadiationVisualizer.MovementDirection direction;
+        if (distanceToRadiationX <= 15) {
+            int oldDistance = getDistanceToRadiation(oldLocation, radius, Axis.X);
+            direction = getDirection(oldDistance,  distanceToRadiationX);
+
+            renderGlass(direction, distanceToRadiationX, Axis.X);
+        }
+        if (distanceToRadiationZ <= 15) {
+            int oldDistance = getDistanceToRadiation(oldLocation, radius, Axis.Z);
+            direction = getDirection(oldDistance,  distanceToRadiationZ);
+
+            renderGlass(direction, distanceToRadiationZ, Axis.Z);
+        }
+    }
+
+    public int getDistanceToRadiation(Location location, int radius, Axis axis) {
+        int real = switch (axis) {
+            case X -> Math.abs(location.getBlockZ()) - Math.abs(spawnpoint.getBlockZ());
+            case Y -> 0;
+            case Z -> Math.abs(location.getBlockX()) - Math.abs(spawnpoint.getBlockX());
+        };
+        return Math.min(Math.abs(real - (-radius)), Math.abs(real - radius));
+    }
+
+    private RadiationVisualizer.MovementDirection getDirection(int oldDistance, int newDistance) {
+        if (newDistance < oldDistance) return RadiationVisualizer.MovementDirection.APPROACHING;
+        if (newDistance > oldDistance) return RadiationVisualizer.MovementDirection.RECEDING;
+        return RadiationVisualizer.MovementDirection.PARALLEL;
+    }
+
+    private void renderGlass(MovementDirection direction, int distance, Axis axis) {
         int r = 16 - distance;
         Set<Point> pointsToRender = new HashSet<>();
         Set<Point> pointsToDeRender = new HashSet<>();
@@ -65,7 +105,7 @@ public class Renderer {
 
         List<BlockState> blocks = new ArrayList<>();
         if (!pointsToRender.isEmpty()) {
-            Set<Vector3> blocksToRender = calculateBlocks(distance, pointsToRender, isNearEastRadiation, axis, spawnpoint);
+            Set<Vector3> blocksToRender = calculateBlocks(distance, pointsToRender, isNearEastRadiation, axis);
             blocks.addAll(getBlockStates(blocksToRender, true));
         }
 
@@ -77,21 +117,21 @@ public class Renderer {
                 pointsToDeRender.add( new Point(0, -1));
                 pointsToDeRender.add( new Point(0, 0));
             }
-            Set<Vector3> blocksToDeRender = calculateBlocks(distance, pointsToDeRender, isNearEastRadiation, axis, spawnpoint);
+            Set<Vector3> blocksToDeRender = calculateBlocks(distance, pointsToDeRender, isNearEastRadiation, axis);
             blocks.addAll(getBlockStates(blocksToDeRender, false));
         }
         player.sendBlockChanges(blocks);
     }
 
-    private Set<Vector3> calculateBlocks(int distance, Set<Point> pointsToCalculate, int isNearNorthEastRadiation, Axis axis, Location spawnpoint) {
+    private Set<Vector3> calculateBlocks(int distance, Set<Point> pointsToCalculate, int isNearNorthEastRadiation, Axis axis) {
         Set<Vector3> calculatedBlocks = new HashSet<>();
-        int r = config.getInt("Radiation_Safe_Zone_Size");
+        int radius = config.getInt("Radiation_Safe_Zone_Size");
         int minBorder;
         int maxBorder;
         switch (axis) {
             case Axis.X :
-                minBorder = spawnpoint.getBlockX() - r;
-                maxBorder = spawnpoint.getBlockX() + r;
+                minBorder = spawnpoint.getBlockX() - radius;
+                maxBorder = spawnpoint.getBlockX() + radius;
                 for (Point point : pointsToCalculate) {
                 int x = playerX + point.x;
                 if (x < minBorder || maxBorder < x) continue;
@@ -102,8 +142,8 @@ public class Renderer {
             }
             break;
             case Axis.Z : for (Point point : pointsToCalculate) {
-                minBorder = spawnpoint.getBlockZ() - r;
-                maxBorder = spawnpoint.getBlockZ() + r;
+                minBorder = spawnpoint.getBlockZ() - radius;
+                maxBorder = spawnpoint.getBlockZ() + radius;
                 int x = playerX + ((distance - 1) * isNearNorthEastRadiation);
                 int y = playerY + point.y;
                 if (y < -64 || 320 < y) continue;

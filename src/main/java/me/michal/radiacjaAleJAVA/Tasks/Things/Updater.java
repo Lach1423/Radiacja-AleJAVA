@@ -1,10 +1,10 @@
 package me.michal.radiacjaAleJAVA.Tasks.Things;
 
 
+import net.kyori.adventure.text.Component;
+import net.kyori.adventure.text.format.NamedTextColor;
 import org.bukkit.Bukkit;
-import org.bukkit.ChatColor;
 import org.bukkit.entity.Player;
-import org.bukkit.event.block.SignChangeEvent;
 
 import java.io.*;
 import java.net.URI;
@@ -32,7 +32,7 @@ public class Updater {
         try {
             Updater.url = URI.create("https://github.com/Lach1423/Radiacja/raw/refs/heads/main/" + fileToGet).toURL();
         } catch (Exception ex) {
-            player.sendMessage(ChatColor.RED + "Invalid link file");
+            player.sendMessage(Component.text("Invalid link file",  NamedTextColor.RED));
             player.sendMessage(Updater.url.toString());
         }
         saveFile();
@@ -49,8 +49,7 @@ public class Updater {
             br.close();
 
         } catch (Exception err) {
-            player.sendMessage(ChatColor.RED + "zły version.txt");
-
+            player.sendMessage(Component.text("zły version.txt", NamedTextColor.RED));
             return null;
         }
         return nv;
@@ -116,7 +115,7 @@ public class Updater {
                 }
             }
         } catch (Exception ex) {
-            player.sendMessage(ChatColor.RED + "Failure in downloading");
+            player.sendMessage(Component.text("Failure in downloading",  NamedTextColor.RED));
         } finally {
             try {
                 if (in != null) {
