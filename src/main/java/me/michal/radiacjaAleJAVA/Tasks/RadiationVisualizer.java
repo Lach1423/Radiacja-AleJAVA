@@ -7,12 +7,13 @@ import org.bukkit.Material;
 import org.bukkit.World;
 import org.bukkit.block.Block;
 import org.bukkit.block.BlockState;
-import org.bukkit.configuration.file.FileConfiguration;
 import org.bukkit.entity.Player;
 
 import java.awt.*;
-import java.util.*;
+import java.util.ArrayList;
+import java.util.HashSet;
 import java.util.List;
+import java.util.Set;
 
 public class RadiationVisualizer {
     Player player;
@@ -44,8 +45,6 @@ public class RadiationVisualizer {
         FORCEFIELD,
         NOTHING
     }
-
-    FileConfiguration config;
 
     public RadiationVisualizer(Player player, Location playerLocation, int radius, Location spawnpoint) {
         this.player = player;
@@ -125,7 +124,7 @@ public class RadiationVisualizer {
 
     private Set<Vector3> calculateBlocks(int distance, Set<Point> pointsToCalculate, int isNearNorthEastRadiation, Axis axis) {
         Set<Vector3> calculatedBlocks = new HashSet<>();
-        int radius = config.getInt("Radiation_Safe_Zone_Size");
+        int radius = this.radius - 1;
         int minBorder;
         int maxBorder;
         switch (axis) {
